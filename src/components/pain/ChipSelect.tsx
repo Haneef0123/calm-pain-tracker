@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { PainTypeInfoButton, PainTypeInfoSheet, PAIN_TYPE_INFO } from './PainTypeInfo';
+import { Info } from 'lucide-react';
+import { PainTypeAllInfoSheet } from './PainTypeInfo';
 
 interface ChipSelectProps {
   options: readonly string[];
   selected: string[];
   onChange: (selected: string[]) => void;
   label: string;
-  showInfoIcons?: boolean;
+  showInfoIcon?: boolean;
 }
 
-export function ChipSelect({ options, selected, onChange, label, showInfoIcons = false }: ChipSelectProps) {
+export function ChipSelect({ options, selected, onChange, label, showInfoIcon = false }: ChipSelectProps) {
   const [infoOpen, setInfoOpen] = useState(false);
-  const [activePainType, setActivePainType] = useState<string | null>(null);
 
   const toggleOption = (option: string) => {
     if (selected.includes(option)) {
@@ -22,50 +22,47 @@ export function ChipSelect({ options, selected, onChange, label, showInfoIcons =
     }
   };
 
-  const handleInfoOpen = (option: string) => {
-    setActivePainType(option);
-    setInfoOpen(true);
-  };
-
   return (
     <>
       <div className="space-y-3">
-        <span className="text-label">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-label">{label}</span>
+          {showInfoIcon && (
+            <button
+              type="button"
+              onClick={() => setInfoOpen(true)}
+              className="inline-flex items-center justify-center w-4 h-4 text-secondary hover:text-foreground transition-colors duration-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-foreground rounded-full"
+              aria-label="More information about pain types"
+            >
+              <Info className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           {options.map((option) => {
             const isSelected = selected.includes(option);
-            const hasInfo = showInfoIcons && PAIN_TYPE_INFO[option];
             return (
-              <div key={option} className="inline-flex items-center">
-                <button
-                  type="button"
-                  onClick={() => toggleOption(option)}
-                  className={cn(
-                    'px-3 py-1.5 text-sm rounded-sm border transition-all duration-100',
-                    isSelected
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'bg-transparent text-foreground border-border hover:border-foreground'
-                  )}
-                >
-                  {option}
-                </button>
-                {hasInfo && (
-                  <PainTypeInfoButton 
-                    painType={option} 
-                    onOpen={() => handleInfoOpen(option)} 
-                  />
+              <button
+                key={option}
+                type="button"
+                onClick={() => toggleOption(option)}
+                className={cn(
+                  'px-3 py-1.5 text-sm rounded-sm border transition-all duration-100',
+                  isSelected
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'bg-transparent text-foreground border-border hover:border-foreground'
                 )}
-              </div>
+              >
+                {option}
+              </button>
             );
           })}
         </div>
       </div>
       
-      <PainTypeInfoSheet 
-        painType={activePainType}
-        open={infoOpen}
-        onOpenChange={setInfoOpen}
-      />
+      {showInfoIcon && (
+        <PainTypeAllInfoSheet open={infoOpen} onOpenChange={setInfoOpen} />
+      )}
     </>
   );
 }
