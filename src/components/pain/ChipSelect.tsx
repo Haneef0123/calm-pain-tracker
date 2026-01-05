@@ -31,7 +31,7 @@ export function ChipSelect({ options, selected, onChange, label, showInfoIcon = 
             <button
               type="button"
               onClick={() => setInfoOpen(true)}
-              className="inline-flex items-center justify-center w-4 h-4 text-secondary hover:text-foreground transition-colors duration-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-foreground rounded-full"
+              className="inline-flex items-center justify-center w-4 h-4 text-muted-foreground hover:text-foreground transition-colors duration-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-foreground rounded-full"
               aria-label="More information about pain types"
             >
               <Info className="w-3.5 h-3.5" strokeWidth={1.5} />
