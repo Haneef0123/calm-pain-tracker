@@ -94,7 +94,7 @@ export default function DailyEntry() {
           options={PAIN_TYPES}
           selected={types}
           onChange={setTypes}
-          showInfoIcons
+          showInfoIcon
         />
 
         <div className="divider" />
