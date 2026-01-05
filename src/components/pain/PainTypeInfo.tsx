@@ -55,7 +55,7 @@ export function PainTypeAllInfoSheet({ open, onOpenChange }: PainTypeAllInfoShee
       {PAIN_TYPE_INFO_LIST.map((item) => (
         <div key={item.title} className="space-y-1.5">
           <h3 className="text-sm font-medium text-foreground">{item.title}</h3>
-          <p className="text-sm font-light text-secondary leading-relaxed">
+          <p className="text-sm font-light text-muted-foreground leading-relaxed">
             {item.description}
           </p>
         </div>
