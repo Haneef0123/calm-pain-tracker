@@ -3,27 +3,29 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
+  DrawerDescription,
 } from '@/components/ui/drawer';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const PAIN_TYPE_INFO_LIST = [
   {
-    title: 'Dull / Aching',
+    title: 'Dull / Aching Pain',
     description: 'A constant, sore, or heavy feeling. Often linked to muscle fatigue or prolonged posture.',
   },
   {
-    title: 'Sharp / Stabbing',
+    title: 'Sharp / Stabbing Pain',
     description: 'Sudden, intense pain that comes and goes. Common with movement or specific positions.',
   },
   {
-    title: 'Burning',
+    title: 'Burning Pain',
     description: 'A warm or burning sensation. May indicate nerve irritation or inflammation.',
   },
   {
@@ -35,7 +37,7 @@ const PAIN_TYPE_INFO_LIST = [
     description: 'Reduced or absent sensation. Can occur when nerves are under pressure.',
   },
   {
-    title: 'Radiating',
+    title: 'Radiating Pain',
     description: 'Pain that travels from the back into the leg or foot. Common in disc-related nerve involvement.',
   },
 ];
@@ -49,9 +51,9 @@ export function PainTypeAllInfoSheet({ open, onOpenChange }: PainTypeAllInfoShee
   const isMobile = useIsMobile();
 
   const content = (
-    <div className="space-y-5">
+    <div className="space-y-6 py-2">
       {PAIN_TYPE_INFO_LIST.map((item) => (
-        <div key={item.title} className="space-y-1">
+        <div key={item.title} className="space-y-1.5">
           <h3 className="text-sm font-medium text-foreground">{item.title}</h3>
           <p className="text-sm font-light text-secondary leading-relaxed">
             {item.description}
@@ -64,15 +66,18 @@ export function PainTypeAllInfoSheet({ open, onOpenChange }: PainTypeAllInfoShee
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="bg-card border-border max-h-[85vh]">
-          <DrawerHeader className="text-left pb-2">
+        <DrawerContent className="bg-card border-border">
+          <DrawerHeader className="text-left">
             <DrawerTitle className="text-base font-medium text-foreground">
               Pain Types
             </DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Learn about different types of pain
+            </DrawerDescription>
           </DrawerHeader>
-          <ScrollArea className="px-4 pb-6 max-h-[60vh]">
+          <div className="px-4 pb-8 max-h-[60vh] overflow-y-auto">
             {content}
-          </ScrollArea>
+          </div>
         </DrawerContent>
       </Drawer>
     );
@@ -85,8 +90,11 @@ export function PainTypeAllInfoSheet({ open, onOpenChange }: PainTypeAllInfoShee
           <DialogTitle className="text-base font-medium text-foreground">
             Pain Types
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Learn about different types of pain
+          </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh] pr-4">
+        <ScrollArea className="max-h-[60vh]">
           {content}
         </ScrollArea>
       </DialogContent>
