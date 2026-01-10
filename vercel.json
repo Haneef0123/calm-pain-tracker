@@ -1,4 +1,4 @@
 {
-    "installCommand": "npm ci --legacy-peer-deps",
-    "framework": "nextjs"
+    "framework": "nextjs",
+    "installCommand": "npm install --legacy-peer-deps"
 }
