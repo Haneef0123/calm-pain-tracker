@@ -1,0 +1,12 @@
+{
+    "name": "Data Layer Review",
+    "description": "Reminds agent of data layer patterns when hooks are modified",
+    "trigger": {
+        "type": "fileSave",
+        "pattern": "src/hooks/**/*.ts"
+    },
+    "action": {
+        "type": "message",
+        "message": "Hook modified. Verify: 1) localStorage access only through usePainEntries 2) Storage keys prefixed with 'painDiary.' 3) useCallback for handlers 4) Return object not array 5) No derived data stored"
+    }
+}

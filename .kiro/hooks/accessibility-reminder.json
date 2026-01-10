@@ -1,0 +1,12 @@
+{
+    "name": "Accessibility Reminder",
+    "description": "Reminds agent to verify accessibility when modifying UI components",
+    "trigger": {
+        "type": "fileSave",
+        "pattern": "src/components/pain/**/*.tsx"
+    },
+    "action": {
+        "type": "message",
+        "message": "Component modified. Please verify: 1) Keyboard navigation works 2) ARIA labels are present for icon-only buttons 3) Focus states are visible 4) Color contrast meets WCAG AA (4.5:1)"
+    }
+}

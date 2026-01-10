@@ -1,0 +1,12 @@
+{
+    "name": "Lint on Save",
+    "description": "Runs ESLint when TypeScript/React files are saved to catch issues early",
+    "trigger": {
+        "type": "fileSave",
+        "pattern": "**/*.{ts,tsx}"
+    },
+    "action": {
+        "type": "command",
+        "command": "npm run lint -- --max-warnings 0"
+    }
+}
