@@ -1,0 +1,12 @@
+{
+    "name": "Type Check Components",
+    "description": "Runs TypeScript compiler on component changes to catch type errors immediately",
+    "trigger": {
+        "type": "fileSave",
+        "pattern": "src/components/**/*.tsx"
+    },
+    "action": {
+        "type": "command",
+        "command": "npx tsc --noEmit"
+    }
+}

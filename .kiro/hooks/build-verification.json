@@ -1,0 +1,11 @@
+{
+    "name": "Build Verification",
+    "description": "Runs npm run build after agent completes to ensure no TypeScript or build errors",
+    "trigger": {
+        "type": "agentComplete"
+    },
+    "action": {
+        "type": "command",
+        "command": "npm run build"
+    }
+}
