@@ -37,8 +37,10 @@ Ask yourself:
 - Feature breaks mobile-first responsive design → Rethink the UI approach
 - Feature adds external API calls → Violates privacy-first principle, discuss alternatives
 - Feature requires global state → Consider if React Query or context is needed
-- Feature duplicates existing logic → Refactor to share code
+- Feature duplicates existing logic → Use shared utilities from `lib/utils.ts`
 - Feature makes a component do too many things → Split into smaller components
+- Feature adds inline SVGs → Extract to `components/icons/`
+- Feature duplicates pain level coloring → Use `getPainLevelClass` from utils
 
 **Yellow Flags - Proceed with Caution:**
 - Feature adds new page → Ensure it follows `PageLayout` pattern
@@ -94,15 +96,33 @@ If the current architecture cannot cleanly support the feature, propose changes:
 
 ## Common Evolution Patterns
 
+### Adding a New Icon
+1. Create icon component in `components/icons/MyIcon.tsx`
+2. Accept `className` and optional `size` props
+3. Export from `components/icons/index.ts` barrel file
+4. Import via `@/components/icons`
+
+### Adding a New Utility Function
+1. Add function to `lib/utils.ts`
+2. Export with explicit return type
+3. Document usage in this file if it's a common pattern
+4. Update components to use the shared utility
+
+### Adding a New Domain Component
+1. Create in `components/pain/` directory
+2. Follow the component checklist in `component-patterns.md`
+3. Use existing utilities (`cn`, `getPainLevelClass`)
+4. Accept typed props, emit changes via callbacks
+
 ### Adding a New Data Field
-1. Update `PainEntry` interface in `src/types/pain-entry.ts`
+1. Update `PainEntry` interface in `types/pain-entry.ts`
 2. Update `usePainEntries` if new field needs special handling
 3. Update CSV export/import to include new field
 4. Consider backward compatibility with existing stored data
 
 ### Adding a New Page
-1. Create page in `src/pages/`
-2. Add route in `src/App.tsx`
+1. Create route in `app/newpage/page.tsx`
+2. Create page component in `components/pages/NewPage.tsx`
 3. Add to `BottomNav` if it's a primary navigation item
 4. Follow `PageLayout` wrapper pattern
 
@@ -130,6 +150,9 @@ Document significant decisions here:
 | Initial | Single `usePainEntries` hook | Centralized data management |
 | Initial | shadcn/ui for primitives | Accessible, customizable, no lock-in |
 | Initial | CSS variables for theming | Easy dark mode, consistent design tokens |
+| 2026-01 | Extract SVGs to `components/icons/` | Reusable icons, cleaner JSX |
+| 2026-01 | Centralize `getPainLevelClass` in utils | Single source of truth for pain coloring |
+| 2026-01 | Extract sub-components (StatsCard, etc.) | Focused components, better readability |
 
 ## Quality Gates
 

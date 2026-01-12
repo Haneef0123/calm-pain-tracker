@@ -80,12 +80,15 @@ export function MyComponent({ value, onChange }: MyComponentProps) {
 ## File Naming
 
 - Components: PascalCase (`PainSlider.tsx`)
+- Icons: PascalCase with `Icon` suffix (`GoogleIcon.tsx`, `SpinnerIcon.tsx`)
 - Hooks: kebab-case with `use-` prefix (`use-pain-entries.ts`)
 - Types: kebab-case (`pain-entry.ts`)
 - Pages: PascalCase (`DailyEntry.tsx`)
+- Utilities: kebab-case (`utils.ts`)
 
 ## Imports
 
 - Use `@/` alias for all internal imports
-- Group: React → external libs → internal components → types
+- Group: React → external libs → internal components → icons → types
 - No relative imports going up more than one level
+- Import icons from `@/components/icons` barrel file

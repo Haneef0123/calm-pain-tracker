@@ -1,11 +1,15 @@
 'use client';
 
-import { useRef } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { usePainEntries } from '@/hooks/use-pain-entries';
+import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
-import { Download, Upload, Trash2, Shield } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { Download, Trash2, LogOut, UserX } from 'lucide-react';
+import { AccountInfo } from '@/components/pain/AccountInfo';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,10 +21,20 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import type { PainEntry } from '@/types/pain-entry';
 
-export default function Settings() {
-    const { entries, exportToCsv, importFromCsv, clearAllEntries } = usePainEntries();
-    const fileInputRef = useRef<HTMLInputElement>(null);
+interface SettingsProps {
+    initialEntries: PainEntry[];
+    userEmail: string | null;
+}
+
+export default function Settings({ initialEntries, userEmail }: SettingsProps) {
+    const { entries, exportToCsv, clearAllEntries } = usePainEntries(initialEntries);
+    const { signOut } = useAuth();
+    const router = useRouter();
+    const [isSigningOut, setIsSigningOut] = useState(false);
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const supabase = createClient();
 
     const handleExport = () => {
         if (entries.length === 0) {
@@ -37,38 +51,67 @@ export default function Settings() {
         });
     };
 
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        try {
+            await signOut();
+            router.push('/sign-in');
+        } catch {
+            toast({
+                title: 'Sign out failed',
+                description: 'Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsSigningOut(false);
+        }
     };
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const handleDeleteAccount = async () => {
+        setIsDeletingAccount(true);
         try {
-            await importFromCsv(file);
+            // Delete all user data first (entries will cascade delete with user)
+            // Then delete the user account
+            const { error } = await supabase.rpc('delete_user');
+
+            if (error) {
+                // If RPC doesn't exist, just sign out
+                // The user can contact support for full deletion
+                await signOut();
+                router.push('/sign-in');
+                toast({
+                    title: 'Signed out',
+                    description: 'Contact support to complete account deletion.',
+                });
+                return;
+            }
+
+            router.push('/sign-in');
             toast({
-                title: 'Import complete',
-                description: 'Your data has been imported.',
+                title: 'Account deleted',
+                description: 'Your account and all data have been removed.',
             });
         } catch {
             toast({
-                title: 'Import failed',
-                description: 'Could not read the CSV file.',
+                title: 'Deletion failed',
+                description: 'Please try again or contact support.',
                 variant: 'destructive',
             });
+        } finally {
+            setIsDeletingAccount(false);
         }
-
-        // Reset input
-        e.target.value = '';
     };
 
-    const handleClearAll = () => {
-        clearAllEntries();
-        toast({
-            title: 'Data cleared',
-            description: 'All entries have been deleted.',
-        });
+    const handleClearAll = async () => {
+        try {
+            await clearAllEntries();
+            toast({
+                title: 'Data cleared',
+                description: 'All entries have been deleted.',
+            });
+        } catch {
+            // Error already shown by hook
+        }
     };
 
     return (
@@ -77,6 +120,11 @@ export default function Settings() {
                 <header className="mb-8">
                     <h1 className="text-heading">Settings</h1>
                 </header>
+
+                {/* Account section */}
+                <div className="mb-8">
+                    <AccountInfo email={userEmail} entryCount={entries.length} />
+                </div>
 
                 <div className="space-y-4">
                     {/* Export */}
@@ -89,39 +137,20 @@ export default function Settings() {
                         Export CSV
                     </Button>
 
-                    {/* Import */}
-                    <Button
-                        variant="outline"
-                        className="w-full justify-start h-12 bg-card border-border"
-                        onClick={handleImportClick}
-                    >
-                        <Upload className="w-4 h-4 mr-3" />
-                        Import CSV
-                    </Button>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv"
-                        onChange={handleFileChange}
-                        className="hidden"
-                    />
-
-                    <div className="divider my-6" />
-
                     {/* Clear data */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button
                                 variant="outline"
-                                className="w-full justify-start h-12 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                                className="w-full justify-start h-12 border-border"
                             >
                                 <Trash2 className="w-4 h-4 mr-3" />
-                                Clear all data
+                                Clear all entries
                             </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="bg-card">
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Clear all data?</AlertDialogTitle>
+                                <AlertDialogTitle>Clear all entries?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     This will permanently delete all {entries.length} pain entries.
                                     Consider exporting your data first. This action cannot be undone.
@@ -138,25 +167,52 @@ export default function Settings() {
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
-                </div>
 
-                {/* Privacy note */}
-                <div className="mt-12 p-4 bg-card rounded-sm">
-                    <div className="flex gap-3">
-                        <Shield className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <div>
-                            <p className="text-sm font-medium mb-1">Privacy</p>
-                            <p className="text-label leading-relaxed">
-                                All data is stored only on this device. No accounts. No servers. No tracking.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                    <div className="h-px bg-border my-6" />
 
-                {/* Entry count */}
-                <p className="text-center text-label mt-8">
-                    {entries.length} entries stored locally
-                </p>
+                    {/* Sign out */}
+                    <Button
+                        variant="outline"
+                        className="w-full justify-start h-12 border-border"
+                        onClick={handleSignOut}
+                        disabled={isSigningOut}
+                    >
+                        <LogOut className="w-4 h-4 mr-3" />
+                        {isSigningOut ? 'Signing out...' : 'Sign out'}
+                    </Button>
+
+                    {/* Delete account */}
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className="w-full justify-start h-12 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                                <UserX className="w-4 h-4 mr-3" />
+                                Delete account
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-card">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete your account and all {entries.length} pain entries.
+                                    This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={handleDeleteAccount}
+                                    disabled={isDeletingAccount}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    {isDeletingAccount ? 'Deleting...' : 'Delete account'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
             </div>
         </PageLayout>
     );
