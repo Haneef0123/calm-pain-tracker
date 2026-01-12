@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { PAIN_LOCATIONS, PAIN_TYPES } from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, getPainLevelClass } from '@/lib/utils';
 
 export default function DailyEntry() {
     const { addEntry } = usePainEntries();
@@ -46,12 +46,6 @@ export default function DailyEntry() {
         });
     };
 
-    const getPainClass = (level: number) => {
-        if (level <= 3) return 'text-foreground';
-        if (level <= 6) return 'text-foreground';
-        return 'text-destructive';
-    };
-
     return (
         <PageLayout>
             <div className="pt-8 space-y-10 animate-fade-in">
@@ -70,7 +64,7 @@ export default function DailyEntry() {
                 {/* Pain level display */}
                 <div className="text-center space-y-2">
                     <p className="text-label">Pain Level</p>
-                    <p className={cn('text-display', getPainClass(painLevel))}>
+                    <p className={cn('text-display', getPainLevelClass(painLevel))}>
                         {painLevel}
                     </p>
                 </div>

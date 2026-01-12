@@ -1,26 +1,43 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
-import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-export function usePainEntries() {
-  const [entries, setEntries] = useState<PainEntry[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const { user } = useAuth();
-  const supabase = createClient();
+export function usePainEntries(initialEntries: PainEntry[] = []) {
+  const [entries, setEntries] = useState<PainEntry[]>(initialEntries);
+  const [isLoaded, setIsLoaded] = useState(initialEntries.length > 0);
+  const supabaseRef = useRef<SupabaseClient | null>(null);
+  const initializedRef = useRef(initialEntries.length > 0);
 
-  // Fetch entries on mount and when user changes
+  // Get or create client (only on client side)
+  const getSupabase = useCallback(() => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient();
+    }
+    return supabaseRef.current;
+  }, []);
+
+  // Get current user - middleware guarantees auth on protected routes
+  const getUser = useCallback(async () => {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    return user;
+  }, [getSupabase]);
+
+  // Only fetch if no initial entries were provided (client-side navigation)
   useEffect(() => {
-    if (!user) {
-      setEntries([]);
+    // Skip fetch if we have initial entries from SSR
+    if (initializedRef.current) {
       setIsLoaded(true);
       return;
     }
 
     const fetchEntries = async () => {
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('pain_entries')
         .select('*')
@@ -40,10 +57,11 @@ export function usePainEntries() {
     };
 
     fetchEntries();
-  }, [user, supabase]);
+  }, [getSupabase]);
 
   const addEntry = useCallback(async (entry: NewPainEntry): Promise<PainEntry> => {
-    if (!user) throw new Error('Not authenticated');
+    const user = await getUser();
+    const supabase = getSupabase();
 
     // Optimistic update
     const tempId = crypto.randomUUID();
@@ -78,10 +96,10 @@ export function usePainEntries() {
     // Replace temp entry with real one
     setEntries(prev => prev.map(e => e.id === tempId ? newEntry : e));
     return newEntry;
-  }, [user, supabase]);
+  }, [getUser, getSupabase]);
 
   const updateEntry = useCallback(async (id: string, updates: Partial<NewPainEntry>): Promise<void> => {
-    if (!user) throw new Error('Not authenticated');
+    const supabase = getSupabase();
 
     // Store previous state for rollback
     const previousEntries = entries;
@@ -113,10 +131,10 @@ export function usePainEntries() {
       });
       throw error;
     }
-  }, [user, supabase, entries]);
+  }, [getSupabase, entries]);
 
   const deleteEntry = useCallback(async (id: string): Promise<void> => {
-    if (!user) throw new Error('Not authenticated');
+    const supabase = getSupabase();
 
     // Store for rollback
     const previousEntries = entries;
@@ -139,10 +157,11 @@ export function usePainEntries() {
       });
       throw error;
     }
-  }, [user, supabase, entries]);
+  }, [getSupabase, entries]);
 
   const clearAllEntries = useCallback(async (): Promise<void> => {
-    if (!user) throw new Error('Not authenticated');
+    const user = await getUser();
+    const supabase = getSupabase();
 
     const previousEntries = entries;
     setEntries([]);
@@ -161,7 +180,7 @@ export function usePainEntries() {
       });
       throw error;
     }
-  }, [user, supabase, entries]);
+  }, [getUser, getSupabase, entries]);
 
   const exportToCsv = useCallback(() => {
     const headers = ['Date', 'Time', 'Pain Level', 'Locations', 'Types', 'Radiating', 'Notes'];
