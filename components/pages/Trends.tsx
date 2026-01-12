@@ -5,12 +5,16 @@ import { format, subDays, isAfter, parseISO } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { cn } from '@/lib/utils';
+import { StatsCard } from '@/components/pain/StatsCard';
+import { TimeRangeSelector, type TimeRange } from '@/components/pain/TimeRangeSelector';
+import type { PainEntry } from '@/types/pain-entry';
 
-type TimeRange = '7d' | '30d' | 'all';
+interface TrendsProps {
+    initialEntries: PainEntry[];
+}
 
-export default function Trends() {
-    const { entries } = usePainEntries();
+export default function Trends({ initialEntries }: TrendsProps) {
+    const { entries } = usePainEntries(initialEntries);
     const [range, setRange] = useState<TimeRange>('7d');
 
     const filteredEntries = useMemo(() => {
@@ -46,12 +50,6 @@ export default function Trends() {
         };
     }, [filteredEntries]);
 
-    const getPainClass = (level: number) => {
-        if (level <= 3) return 'text-foreground';
-        if (level <= 6) return 'text-foreground';
-        return 'text-destructive';
-    };
-
     return (
         <PageLayout>
             <div className="pt-8 animate-fade-in">
@@ -60,21 +58,8 @@ export default function Trends() {
                 </header>
 
                 {/* Time range selector */}
-                <div className="flex gap-2 mb-8">
-                    {(['7d', '30d', 'all'] as TimeRange[]).map((r) => (
-                        <button
-                            key={r}
-                            onClick={() => setRange(r)}
-                            className={cn(
-                                'px-4 py-2 text-sm rounded-sm border transition-all duration-100',
-                                range === r
-                                    ? 'bg-foreground text-background border-foreground'
-                                    : 'bg-transparent text-foreground border-border hover:border-foreground'
-                            )}
-                        >
-                            {r === '7d' ? '7 days' : r === '30d' ? '30 days' : 'All time'}
-                        </button>
-                    ))}
+                <div className="mb-8">
+                    <TimeRangeSelector value={range} onChange={setRange} />
                 </div>
 
                 {entries.length === 0 ? (
@@ -86,24 +71,9 @@ export default function Trends() {
                     <>
                         {/* Stats */}
                         <div className="grid grid-cols-3 gap-4 mb-10">
-                            <div className="text-center">
-                                <p className="text-label mb-1">Average</p>
-                                <p className={cn('text-4xl font-semibold tabular-nums', getPainClass(stats.avg))}>
-                                    {stats.avg}
-                                </p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-label mb-1">Worst</p>
-                                <p className={cn('text-4xl font-semibold tabular-nums', getPainClass(stats.worst))}>
-                                    {stats.worst}
-                                </p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-label mb-1">Best</p>
-                                <p className={cn('text-4xl font-semibold tabular-nums', getPainClass(stats.best))}>
-                                    {stats.best}
-                                </p>
-                            </div>
+                            <StatsCard label="Average" value={stats.avg} />
+                            <StatsCard label="Worst" value={stats.worst} />
+                            <StatsCard label="Best" value={stats.best} />
                         </div>
 
                         <div className="divider mb-8" />

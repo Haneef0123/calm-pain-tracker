@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { usePainEntries } from '@/hooks/use-pain-entries';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
-import { Download, Trash2, LogOut, UserX, User } from 'lucide-react';
+import { Download, Trash2, LogOut, UserX } from 'lucide-react';
+import { AccountInfo } from '@/components/pain/AccountInfo';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,10 +21,16 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import type { PainEntry } from '@/types/pain-entry';
 
-export default function Settings() {
-    const { entries, exportToCsv, clearAllEntries } = usePainEntries();
-    const { user, signOut } = useAuth();
+interface SettingsProps {
+    initialEntries: PainEntry[];
+    userEmail: string | null;
+}
+
+export default function Settings({ initialEntries, userEmail }: SettingsProps) {
+    const { entries, exportToCsv, clearAllEntries } = usePainEntries(initialEntries);
+    const { signOut } = useAuth();
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -63,13 +70,9 @@ export default function Settings() {
     const handleDeleteAccount = async () => {
         setIsDeletingAccount(true);
         try {
-            // Delete all user data first (entries will cascade delete with user)
-            // Then delete the user account
             const { error } = await supabase.rpc('delete_user');
 
             if (error) {
-                // If RPC doesn't exist, just sign out
-                // The user can contact support for full deletion
                 await signOut();
                 router.push('/sign-in');
                 toast({
@@ -114,25 +117,11 @@ export default function Settings() {
                     <h1 className="text-heading">Settings</h1>
                 </header>
 
-                {/* Account section */}
-                <div className="mb-8 p-4 bg-card rounded-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                            <User className="w-5 h-5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                                {user?.email || 'Not signed in'}
-                            </p>
-                            <p className="text-label">
-                                {entries.length} entries synced
-                            </p>
-                        </div>
-                    </div>
+                <div className="mb-8">
+                    <AccountInfo email={userEmail} entryCount={entries.length} />
                 </div>
 
                 <div className="space-y-4">
-                    {/* Export */}
                     <Button
                         variant="outline"
                         className="w-full justify-start h-12 bg-card border-border"
@@ -142,7 +131,6 @@ export default function Settings() {
                         Export CSV
                     </Button>
 
-                    {/* Clear data */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button
@@ -175,7 +163,6 @@ export default function Settings() {
 
                     <div className="h-px bg-border my-6" />
 
-                    {/* Sign out */}
                     <Button
                         variant="outline"
                         className="w-full justify-start h-12 border-border"
@@ -186,7 +173,6 @@ export default function Settings() {
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>
 
-                    {/* Delete account */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button

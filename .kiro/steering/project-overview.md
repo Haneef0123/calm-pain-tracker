@@ -30,18 +30,21 @@ app/                     # Next.js App Router pages
 │   └── page.tsx         # /trends
 ├── settings/
 │   └── page.tsx         # /settings
+├── sign-in/
+│   └── page.tsx         # /sign-in
 └── not-found.tsx        # 404 page
 
 components/
+├── icons/               # Reusable SVG icon components (GoogleIcon, SpinnerIcon)
 ├── layout/              # PageLayout, BottomNav (shared structure)
 ├── pages/               # Page content components (DailyEntry, History, etc.)
-├── pain/                # Domain-specific: PainSlider, ChipSelect, PainTypeInfo
+├── pain/                # Domain-specific: PainSlider, ChipSelect, HistoryEntryCard, StatsCard, etc.
 ├── ui/                  # shadcn/ui primitives (DO NOT modify directly)
 └── providers.tsx        # Client-side providers wrapper
 
 hooks/                   # Custom hooks (use-pain-entries is the data layer)
 types/                   # TypeScript interfaces and constants
-lib/                     # Utilities (cn function)
+lib/                     # Utilities (cn, getPainLevelClass)
 ```
 
 ## Core Data Model
@@ -67,6 +70,8 @@ interface PainEntry {
 5. **Charts**: recharts for the Trends page visualization
 6. **Client Components**: All interactive components use `'use client'` directive
 7. **Navigation**: Next.js `Link` component and `usePathname` hook for routing
+8. **Icons**: Custom SVG icons in `components/icons/`, lucide-react for standard icons
+9. **Utilities**: Shared functions in `lib/utils.ts` (e.g., `cn`, `getPainLevelClass`)
 
 ## Design Tokens
 
