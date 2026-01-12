@@ -1,61 +1,167 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { PainEntry } from '@/types/pain-entry';
-
-const STORAGE_KEY = 'painDiary.entries';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
+import { createClient } from '@/lib/supabase/client';
+import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
+import { useAuth } from '@/hooks/use-auth';
+import { toast } from '@/hooks/use-toast';
 
 export function usePainEntries() {
   const [entries, setEntries] = useState<PainEntry[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const { user } = useAuth();
+  const supabase = createClient();
 
-  // Load from localStorage on mount
+  // Fetch entries on mount and when user changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setEntries(JSON.parse(stored));
+    if (!user) {
+      setEntries([]);
+      setIsLoaded(true);
+      return;
+    }
+
+    const fetchEntries = async () => {
+      const { data, error } = await supabase
+        .from('pain_entries')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.error('Failed to fetch entries:', error);
+        toast({
+          title: 'Failed to load entries',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        setEntries((data as DbPainEntry[]).map(dbToClient));
       }
-    } catch (e) {
-      console.error('Failed to load entries:', e);
-    }
-    setIsLoaded(true);
-  }, []);
+      setIsLoaded(true);
+    };
 
-  // Save to localStorage whenever entries change
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    }
-  }, [entries, isLoaded]);
+    fetchEntries();
+  }, [user, supabase]);
 
-  const addEntry = useCallback((entry: Omit<PainEntry, 'id' | 'timestamp'>) => {
-    const newEntry: PainEntry = {
+  const addEntry = useCallback(async (entry: NewPainEntry): Promise<PainEntry> => {
+    if (!user) throw new Error('Not authenticated');
+
+    // Optimistic update
+    const tempId = crypto.randomUUID();
+    const tempEntry: PainEntry = {
       ...entry,
-      id: generateId(),
+      id: tempId,
       timestamp: new Date().toISOString(),
     };
-    setEntries(prev => [newEntry, ...prev]);
-    return newEntry;
-  }, []);
+    setEntries(prev => [tempEntry, ...prev]);
 
-  const updateEntry = useCallback((id: string, updates: Partial<Omit<PainEntry, 'id'>>) => {
+    const { data, error } = await supabase
+      .from('pain_entries')
+      .insert({
+        ...clientToDb(entry),
+        user_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Rollback
+      setEntries(prev => prev.filter(e => e.id !== tempId));
+      toast({
+        title: 'Failed to save entry',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+
+    const newEntry = dbToClient(data as DbPainEntry);
+    // Replace temp entry with real one
+    setEntries(prev => prev.map(e => e.id === tempId ? newEntry : e));
+    return newEntry;
+  }, [user, supabase]);
+
+  const updateEntry = useCallback(async (id: string, updates: Partial<NewPainEntry>): Promise<void> => {
+    if (!user) throw new Error('Not authenticated');
+
+    // Store previous state for rollback
+    const previousEntries = entries;
+
+    // Optimistic update
     setEntries(prev => prev.map(entry =>
       entry.id === id ? { ...entry, ...updates } : entry
     ));
-  }, []);
 
-  const deleteEntry = useCallback((id: string) => {
+    const dbUpdates: Partial<DbPainEntry> = {};
+    if (updates.painLevel !== undefined) dbUpdates.pain_level = updates.painLevel;
+    if (updates.locations !== undefined) dbUpdates.locations = updates.locations;
+    if (updates.types !== undefined) dbUpdates.types = updates.types;
+    if (updates.radiating !== undefined) dbUpdates.radiating = updates.radiating;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    const { error } = await supabase
+      .from('pain_entries')
+      .update(dbUpdates)
+      .eq('id', id);
+
+    if (error) {
+      // Rollback
+      setEntries(previousEntries);
+      toast({
+        title: 'Failed to update entry',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [user, supabase, entries]);
+
+  const deleteEntry = useCallback(async (id: string): Promise<void> => {
+    if (!user) throw new Error('Not authenticated');
+
+    // Store for rollback
+    const previousEntries = entries;
+
+    // Optimistic update
     setEntries(prev => prev.filter(entry => entry.id !== id));
-  }, []);
 
-  const clearAllEntries = useCallback(() => {
+    const { error } = await supabase
+      .from('pain_entries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      // Rollback
+      setEntries(previousEntries);
+      toast({
+        title: 'Failed to delete entry',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [user, supabase, entries]);
+
+  const clearAllEntries = useCallback(async (): Promise<void> => {
+    if (!user) throw new Error('Not authenticated');
+
+    const previousEntries = entries;
     setEntries([]);
-  }, []);
+
+    const { error } = await supabase
+      .from('pain_entries')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      setEntries(previousEntries);
+      toast({
+        title: 'Failed to clear entries',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [user, supabase, entries]);
 
   const exportToCsv = useCallback(() => {
     const headers = ['Date', 'Time', 'Pain Level', 'Locations', 'Types', 'Radiating', 'Notes'];
@@ -82,44 +188,6 @@ export function usePainEntries() {
     URL.revokeObjectURL(url);
   }, [entries]);
 
-  const importFromCsv = useCallback((file: File) => {
-    return new Promise<void>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const lines = text.split('\n').slice(1); // Skip header
-          const imported: PainEntry[] = [];
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            const parts = line.match(/(".*?"|[^,]+)/g) || [];
-            if (parts.length >= 6) {
-              const [date, time, painLevel, locations, types, radiating, ...notesParts] = parts;
-              const dateStr = `${date} ${time}`;
-              imported.push({
-                id: generateId(),
-                timestamp: new Date(dateStr).toISOString(),
-                painLevel: parseInt(painLevel) || 0,
-                locations: locations.split('; ').filter(Boolean),
-                types: types.split('; ').filter(Boolean),
-                radiating: radiating.toLowerCase() === 'yes',
-                notes: notesParts.join(',').replace(/^"|"$/g, '').replace(/""/g, '"'),
-              });
-            }
-          }
-
-          setEntries(prev => [...imported, ...prev]);
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  }, []);
-
   return {
     entries,
     isLoaded,
@@ -128,6 +196,5 @@ export function usePainEntries() {
     deleteEntry,
     clearAllEntries,
     exportToCsv,
-    importFromCsv,
   };
 }
