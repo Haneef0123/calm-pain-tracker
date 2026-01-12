@@ -70,13 +70,9 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
     const handleDeleteAccount = async () => {
         setIsDeletingAccount(true);
         try {
-            // Delete all user data first (entries will cascade delete with user)
-            // Then delete the user account
             const { error } = await supabase.rpc('delete_user');
 
             if (error) {
-                // If RPC doesn't exist, just sign out
-                // The user can contact support for full deletion
                 await signOut();
                 router.push('/sign-in');
                 toast({
@@ -121,13 +117,11 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                     <h1 className="text-heading">Settings</h1>
                 </header>
 
-                {/* Account section */}
                 <div className="mb-8">
                     <AccountInfo email={userEmail} entryCount={entries.length} />
                 </div>
 
                 <div className="space-y-4">
-                    {/* Export */}
                     <Button
                         variant="outline"
                         className="w-full justify-start h-12 bg-card border-border"
@@ -137,7 +131,6 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                         Export CSV
                     </Button>
 
-                    {/* Clear data */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button
@@ -170,7 +163,6 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
 
                     <div className="h-px bg-border my-6" />
 
-                    {/* Sign out */}
                     <Button
                         variant="outline"
                         className="w-full justify-start h-12 border-border"
@@ -181,7 +173,6 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>
 
-                    {/* Delete account */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button
