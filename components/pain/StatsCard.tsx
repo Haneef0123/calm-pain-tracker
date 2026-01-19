@@ -18,8 +18,8 @@ export function StatsCard({
     const valueColorClass = showPainColor ? getPainLevelClass(value) : 'text-foreground';
 
     return (
-        <div className={cn('text-center', className)}>
-            <p className="text-label mb-1">{label}</p>
+        <div className={cn('text-center flex flex-col', className)}>
+            <p className="text-label mb-2 min-h-[2.5rem] flex items-center justify-center">{label}</p>
             <p className={cn('text-4xl font-semibold tabular-nums', valueColorClass)}>
                 {value}
             </p>
