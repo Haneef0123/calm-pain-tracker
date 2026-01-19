@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, subDays, isAfter, parseISO } from 'date-fns';
+import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays, isSameDay } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import { StatsCard } from '@/components/pain/StatsCard';
 import { TimeRangeSelector, type TimeRange } from '@/components/pain/TimeRangeSelector';
 import type { PainEntry } from '@/types/pain-entry';
@@ -13,8 +13,18 @@ interface TrendsProps {
     initialEntries: PainEntry[];
 }
 
+interface ChartDataPoint {
+    date: string;
+    fullDate: string;
+    pain: number;
+    timestamp: string;
+    locations: string[];
+    types: string[];
+    notes: string;
+}
+
 export default function Trends({ initialEntries }: TrendsProps) {
-    const { entries } = usePainEntries(initialEntries);
+    const { entries, isLoaded } = usePainEntries(initialEntries);
     const [range, setRange] = useState<TimeRange>('7d');
 
     const filteredEntries = useMemo(() => {
@@ -29,12 +39,55 @@ export default function Trends({ initialEntries }: TrendsProps) {
     }, [entries, range]);
 
     const chartData = useMemo(() => {
-        return [...filteredEntries]
-            .reverse()
-            .map(entry => ({
-                date: format(parseISO(entry.timestamp), 'MMM d'),
+        const reversed = [...filteredEntries].reverse();
+
+        // Check if we have multiple entries on the same day
+        const dateMap = new Map<string, number>();
+        reversed.forEach(entry => {
+            const dateKey = format(parseISO(entry.timestamp), 'yyyy-MM-dd');
+            dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
+        });
+        const hasMultipleEntriesPerDay = Array.from(dateMap.values()).some(count => count > 1);
+
+        return reversed.map((entry): ChartDataPoint => {
+            const date = parseISO(entry.timestamp);
+            let dateLabel: string;
+
+            if (hasMultipleEntriesPerDay) {
+                // Show time when multiple entries per day
+                if (isToday(date)) {
+                    dateLabel = format(date, 'h:mm a');
+                } else if (isYesterday(date)) {
+                    dateLabel = `Yesterday ${format(date, 'h:mm a')}`;
+                } else {
+                    dateLabel = format(date, 'MMM d, h:mm a');
+                }
+            } else {
+                // Show relative dates when one entry per day
+                if (isToday(date)) {
+                    dateLabel = 'Today';
+                } else if (isYesterday(date)) {
+                    dateLabel = 'Yesterday';
+                } else {
+                    const daysAgo = differenceInDays(new Date(), date);
+                    if (daysAgo <= 7) {
+                        dateLabel = `${daysAgo}d ago`;
+                    } else {
+                        dateLabel = format(date, 'MMM d');
+                    }
+                }
+            }
+
+            return {
+                date: dateLabel,
+                fullDate: format(date, 'MMM d, yyyy h:mm a'),
                 pain: entry.painLevel,
-            }));
+                timestamp: entry.timestamp,
+                locations: entry.locations,
+                types: entry.types,
+                notes: entry.notes,
+            };
+        });
     }, [filteredEntries]);
 
     const stats = useMemo(() => {
@@ -49,6 +102,83 @@ export default function Trends({ initialEntries }: TrendsProps) {
             best: Math.min(...levels),
         };
     }, [filteredEntries]);
+
+    const rangeLabel = useMemo(() => {
+        if (range === '7d') return 'last 7 days';
+        if (range === '30d') return 'last 30 days';
+        return 'all time';
+    }, [range]);
+
+    // Custom tooltip component
+    const CustomTooltip = ({ active, payload }: any) => {
+        if (!active || !payload || !payload.length) return null;
+
+        const data = payload[0].payload as ChartDataPoint;
+        const painLevel = data.pain;
+        const painColorClass = painLevel <= 6 ? 'text-foreground' : 'text-destructive';
+
+        return (
+            <div className="bg-card border border-border rounded-sm p-3 shadow-lg max-w-[240px]">
+                <p className="text-xs text-muted-foreground mb-2">{data.fullDate}</p>
+                <p className={`text-2xl font-semibold tabular-nums mb-2 ${painColorClass}`}>
+                    {painLevel}
+                </p>
+                {data.locations.length > 0 && (
+                    <p className="text-xs text-muted-foreground mb-1">
+                        <span className="font-medium">Locations:</span> {data.locations.join(', ')}
+                    </p>
+                )}
+                {data.types.length > 0 && (
+                    <p className="text-xs text-muted-foreground mb-1">
+                        <span className="font-medium">Types:</span> {data.types.join(', ')}
+                    </p>
+                )}
+                {data.notes && (
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                        &ldquo;{data.notes.slice(0, 60)}{data.notes.length > 60 ? '...' : ''}&rdquo;
+                    </p>
+                )}
+            </div>
+        );
+    };
+
+    // Custom dot component with color coding
+    const CustomDot = (props: any) => {
+        const { cx, cy, payload } = props;
+        const painLevel = payload.pain;
+        const color = painLevel <= 6 ? 'hsl(var(--foreground))' : 'hsl(var(--destructive))';
+
+        return (
+            <>
+                {/* Larger invisible hit area for mobile */}
+                <circle cx={cx} cy={cy} r={12} fill="transparent" style={{ cursor: 'pointer' }} />
+                {/* Visible dot */}
+                <circle cx={cx} cy={cy} r={4} fill={color} stroke="hsl(var(--background))" strokeWidth={1.5} />
+            </>
+        );
+    };
+
+    // Loading skeleton
+    if (!isLoaded) {
+        return (
+            <PageLayout>
+                <div className="pt-8 animate-fade-in">
+                    <header className="mb-8">
+                        <h1 className="text-heading">Trends</h1>
+                    </header>
+                    <div className="animate-pulse">
+                        <div className="h-10 bg-muted rounded-sm mb-8 w-80" />
+                        <div className="grid grid-cols-3 gap-4 mb-10">
+                            <div className="h-20 bg-muted rounded-sm" />
+                            <div className="h-20 bg-muted rounded-sm" />
+                            <div className="h-20 bg-muted rounded-sm" />
+                        </div>
+                        <div className="h-64 bg-muted rounded-sm" />
+                    </div>
+                </div>
+            </PageLayout>
+        );
+    }
 
     return (
         <PageLayout>
@@ -76,51 +206,66 @@ export default function Trends({ initialEntries }: TrendsProps) {
                             <StatsCard label="Best" value={stats.best} />
                         </div>
 
-                        <div className="divider mb-8" />
+                        <p className="text-xs text-muted-foreground text-center mb-6">
+                            Showing {rangeLabel}
+                        </p>
 
                         {/* Chart */}
                         {chartData.length > 1 ? (
-                            <div className="h-48">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-                                        <XAxis
-                                            dataKey="date"
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                                            interval="preserveStartEnd"
-                                        />
-                                        <YAxis
-                                            domain={[0, 10]}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                                            ticks={[0, 5, 10]}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
-                                                border: '1px solid hsl(var(--border))',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                            }}
-                                            labelStyle={{ color: 'hsl(var(--foreground))' }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="pain"
-                                            stroke="hsl(var(--foreground))"
-                                            strokeWidth={1.5}
-                                            dot={{ r: 3, fill: 'hsl(var(--foreground))' }}
-                                            activeDot={{ r: 5 }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
+                            <div className="bg-card border border-border rounded-sm p-4 mb-8">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-sm font-medium text-muted-foreground">Pain Level</h2>
+                                    <p className="text-xs text-muted-foreground">
+                                        {chartData.length} {chartData.length === 1 ? 'entry' : 'entries'}
+                                    </p>
+                                </div>
+                                <div className="h-64 md:h-80" role="img" aria-label={`Pain level chart showing ${chartData.length} entries over ${rangeLabel}`}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                stroke="hsl(var(--border))"
+                                                vertical={false}
+                                                opacity={0.3}
+                                            />
+                                            <XAxis
+                                                dataKey="date"
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                                                interval="preserveStartEnd"
+                                                height={40}
+                                            />
+                                            <YAxis
+                                                domain={[0, 10]}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                                                ticks={[0, 2, 4, 6, 8, 10]}
+                                                width={30}
+                                            />
+                                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="pain"
+                                                stroke="hsl(var(--foreground))"
+                                                strokeWidth={2}
+                                                dot={<CustomDot />}
+                                                activeDot={{ r: 6, strokeWidth: 2 }}
+                                                animationDuration={300}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <p className="text-xs text-muted-foreground text-center mt-2">
+                                    Lines connect recorded entries &bull; Tap points for details
+                                </p>
                             </div>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">
-                                Need at least 2 entries to show a chart.
-                            </p>
+                            <div className="bg-card border border-border rounded-sm p-8 text-center">
+                                <p className="text-muted-foreground">Need at least 2 entries to show a chart.</p>
+                                <p className="text-label mt-2">Keep tracking to see your pain trends.</p>
+                            </div>
                         )}
                     </>
                 )}
