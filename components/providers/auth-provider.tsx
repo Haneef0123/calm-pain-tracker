@@ -23,25 +23,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const signInWithGoogle = useCallback(async () => {
-        const supabase = getSupabase();
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
-        });
-        if (error) {
-            console.error('Sign in error:', error.message);
-            throw error;
+        try {
+            const supabase = getSupabase();
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+            if (error) {
+                console.error('Sign in error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('Authentication service unavailable:', error);
+            throw new Error('Authentication service is currently unavailable. Please try again later.');
         }
     }, [getSupabase]);
 
     const signOut = useCallback(async () => {
-        const supabase = getSupabase();
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error('Sign out error:', error.message);
-            throw error;
+        try {
+            const supabase = getSupabase();
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.error('Sign out error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('Sign out error:', error);
+            throw new Error('Unable to sign out. Please try again.');
         }
     }, [getSupabase]);
 
