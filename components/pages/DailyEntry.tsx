@@ -24,6 +24,9 @@ export default function DailyEntry() {
 
     const today = new Date();
 
+    // Validation: Require pain level > 0 and at least one location
+    const isValid = painLevel > 0 && locations.length > 0;
+
     const handleSave = () => {
         addEntry({
             painLevel,
@@ -62,7 +65,9 @@ export default function DailyEntry() {
 
                 {/* Pain level display */}
                 <div className="text-center space-y-2">
-                    <p className="text-label">Pain Level</p>
+                    <p className="text-label">
+                        Pain Level <span className="text-destructive">*</span>
+                    </p>
                     <p className={cn('text-display', getPainLevelClass(painLevel))}>
                         {painLevel}
                     </p>
@@ -75,7 +80,7 @@ export default function DailyEntry() {
 
                 {/* Pain locations */}
                 <ChipSelect
-                    label="Location"
+                    label="Location *"
                     options={PAIN_LOCATIONS}
                     selected={locations}
                     onChange={setLocations}
@@ -125,7 +130,8 @@ export default function DailyEntry() {
                 {/* Save button */}
                 <Button
                     onClick={handleSave}
-                    className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100"
+                    disabled={!isValid}
+                    className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Log today
                 </Button>
