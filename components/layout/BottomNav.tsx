@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', icon: Calendar, label: 'Today' },
-  { path: '/history', icon: History, label: 'History' },
-  { path: '/trends', icon: TrendingUp, label: 'Trends' },
-  { path: '/settings', icon: Settings, label: 'Settings' },
+  { path: '/history', icon: History, label: 'Past days' },
+  { path: '/patterns', icon: TrendingUp, label: 'Patterns' },
+  { path: '/about', icon: Settings, label: 'About' },
 ];
 
 export function BottomNav() {

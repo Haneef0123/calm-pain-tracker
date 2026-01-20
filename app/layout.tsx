@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    title: 'Pain Diary',
-    description: 'Privacy-first pain tracking',
+    title: 'PainMap',
+    description: 'See your pain more clearly.',
     icons: {
         icon: '/favicon.ico',
     },

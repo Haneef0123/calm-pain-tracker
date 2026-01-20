@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Trends from '@/components/pages/Trends';
 import { DbPainEntry, dbToClient } from '@/types/pain-entry';
 
-export default async function TrendsPage() {
+export default async function PatternsPage() {
     const supabase = await createClient();
 
     const { data } = await supabase

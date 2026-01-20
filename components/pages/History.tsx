@@ -19,11 +19,10 @@ export default function History({ initialEntries }: HistoryProps) {
             <PageLayout>
                 <div className="pt-8 animate-fade-in">
                     <header className="mb-8">
-                        <h1 className="text-heading">History</h1>
+                        <h1 className="text-heading">Past days</h1>
                     </header>
                     <div className="text-center py-16">
-                        <p className="text-muted-foreground">No entries yet.</p>
-                        <p className="text-label mt-2">Start tracking your pain on the Today tab.</p>
+                        <p className="text-muted-foreground">Once you log a few days, patterns will start to appear here.</p>
                     </div>
                 </div>
             </PageLayout>
@@ -34,7 +33,7 @@ export default function History({ initialEntries }: HistoryProps) {
         <PageLayout>
             <div className="pt-8 animate-fade-in">
                 <header className="mb-8">
-                    <h1 className="text-heading">History</h1>
+                    <h1 className="text-heading">Past days</h1>
                     <p className="text-label mt-1">{entries.length} entries</p>
                 </header>
 
