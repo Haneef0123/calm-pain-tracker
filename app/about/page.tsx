@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Settings from '@/components/pages/Settings';
 import { DbPainEntry, dbToClient } from '@/types/pain-entry';
 
-export default async function SettingsPage() {
+export default async function AboutPage() {
     const supabase = await createClient();
     const { data: userData } = await supabase.auth.getUser();
 

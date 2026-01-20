@@ -44,8 +44,7 @@ export default function DailyEntry() {
         setNotes('');
 
         toast({
-            title: 'Entry saved',
-            description: 'Your pain entry has been recorded.',
+            title: 'Noted.',
         });
     };
 
@@ -117,11 +116,11 @@ export default function DailyEntry() {
                 {/* Notes */}
                 <div className="space-y-3">
                     <Label htmlFor="notes" className="text-label">
-                        Notes (optional)
+                        Anything worth noting?
                     </Label>
                     <Textarea
                         id="notes"
-                        placeholder="How are you feeling today?"
+                        placeholder="Sleep, posture, stress, travel, food — whatever stands out."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         className="min-h-24 bg-card border-border resize-none"
@@ -134,7 +133,7 @@ export default function DailyEntry() {
                     disabled={!isValid}
                     className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Save Entry
+                    Log today
                 </Button>
             </div>
         </PageLayout>
