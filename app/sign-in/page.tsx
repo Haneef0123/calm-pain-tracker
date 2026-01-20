@@ -27,7 +27,7 @@ export default function SignInPage() {
             <div className="w-full max-w-sm space-y-8 text-center animate-fade-in">
                 <div className="space-y-2">
                     <h1 className="text-display text-3xl font-semibold tracking-tight">
-                        Pain Diary
+                        PainMap
                     </h1>
                     <p className="text-muted-foreground">
                         Track your pain, understand your patterns

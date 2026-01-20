@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays, isSameDay } from 'date-fns';
+import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
@@ -164,7 +164,7 @@ export default function Trends({ initialEntries }: TrendsProps) {
             <PageLayout>
                 <div className="pt-8 animate-fade-in">
                     <header className="mb-8">
-                        <h1 className="text-heading">Trends</h1>
+                        <h1 className="text-heading">Patterns</h1>
                     </header>
                     <div className="animate-pulse">
                         <div className="h-10 bg-muted rounded-sm mb-8 w-80" />
@@ -184,7 +184,7 @@ export default function Trends({ initialEntries }: TrendsProps) {
         <PageLayout>
             <div className="pt-8 animate-fade-in">
                 <header className="mb-8">
-                    <h1 className="text-heading">Trends</h1>
+                    <h1 className="text-heading">Patterns</h1>
                 </header>
 
                 {/* Time range selector */}
@@ -194,8 +194,7 @@ export default function Trends({ initialEntries }: TrendsProps) {
 
                 {entries.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-muted-foreground">No data yet.</p>
-                        <p className="text-label mt-2">Start tracking to see trends.</p>
+                        <p className="text-muted-foreground">Once you log a few days, patterns will start to appear here.</p>
                     </div>
                 ) : (
                     <>
@@ -263,8 +262,7 @@ export default function Trends({ initialEntries }: TrendsProps) {
                             </div>
                         ) : (
                             <div className="bg-card border border-border rounded-sm p-8 text-center">
-                                <p className="text-muted-foreground">Need at least 2 entries to show a chart.</p>
-                                <p className="text-label mt-2">Keep tracking to see your pain trends.</p>
+                                <p className="text-muted-foreground">Patterns need time. A few more days will make this clearer.</p>
                             </div>
                         )}
                     </>

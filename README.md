@@ -1,6 +1,6 @@
-# Pain Diary
+# PainMap
 
-A privacy-first pain tracking app for chronic pain sufferers. Track pain levels, locations, and patterns over time.
+A privacy-first pain tracking app for chronic pain sufferers. See your pain more clearly.
 
 ## Tech Stack
 

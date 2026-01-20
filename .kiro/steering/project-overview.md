@@ -2,11 +2,11 @@
 inclusion: always
 --->
 
-# Pain Diary - Project Overview
+# PainMap - Project Overview
 
 ## What This Is
 
-A privacy-first pain tracking PWA for chronic pain sufferers. Built with Next.js 15.x (App Router), React, TypeScript, shadcn/ui, and Tailwind CSS. All data stays on-device via localStorage.
+A privacy-first pain tracking PWA for chronic pain sufferers. Built with Next.js 15.x (App Router), React, TypeScript, shadcn/ui, and Tailwind CSS. See your pain more clearly.
 
 ## Architecture Philosophy
 
@@ -25,11 +25,15 @@ app/                     # Next.js App Router pages
 ├── page.tsx             # Home route (/)
 ├── globals.css          # Global styles
 ├── history/
-│   └── page.tsx         # /history
+│   └── page.tsx         # /history (displays "Past days")
+├── patterns/
+│   └── page.tsx         # /patterns (formerly /trends)
+├── about/
+│   └── page.tsx         # /about (formerly /settings)
 ├── trends/
-│   └── page.tsx         # /trends
+│   └── page.tsx         # /trends (redirects to /patterns)
 ├── settings/
-│   └── page.tsx         # /settings
+│   └── page.tsx         # /settings (redirects to /about)
 ├── sign-in/
 │   └── page.tsx         # /sign-in
 └── not-found.tsx        # 404 page
@@ -66,8 +70,8 @@ interface PainEntry {
 1. **State Management**: `usePainEntries` hook manages all CRUD + localStorage sync
 2. **Styling**: Tailwind + CSS variables for theming (light/dark via `--background`, `--foreground`, etc.)
 3. **Components**: shadcn/ui for primitives, custom components in `pain/` for domain logic
-4. **Routing**: Next.js App Router with file-based routing (4 main routes + 404)
-5. **Charts**: recharts for the Trends page visualization
+4. **Routing**: Next.js App Router with file-based routing (Today, Past days, Patterns, About + 404)
+5. **Charts**: recharts for the Patterns page visualization
 6. **Client Components**: All interactive components use `'use client'` directive
 7. **Navigation**: Next.js `Link` component and `usePathname` hook for routing
 8. **Icons**: Custom SVG icons in `components/icons/`, lucide-react for standard icons

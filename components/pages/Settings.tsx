@@ -114,8 +114,22 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
         <PageLayout>
             <div className="pt-8 animate-fade-in">
                 <header className="mb-8">
-                    <h1 className="text-heading">Settings</h1>
+                    <h1 className="text-heading">About</h1>
                 </header>
+
+                <div className="mb-8 space-y-4 text-sm text-muted-foreground">
+                    <p>
+                        PainMap is a simple way to record pain and notice patterns over time.
+                    </p>
+                    <p>
+                        It doesn&apos;t diagnose or treat — it helps you remember what your body is already telling you.
+                    </p>
+                    <p>
+                        Built for people living with pain, not for tracking perfection.
+                    </p>
+                </div>
+
+                <div className="h-px bg-border my-6" />
 
                 <div className="mb-8">
                     <AccountInfo email={userEmail} entryCount={entries.length} />
