@@ -1,187 +1,228 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
-import type { SupabaseClient } from '@supabase/supabase-js';
+
+// Query key for React Query cache
+const PAIN_ENTRIES_KEY = ['pain-entries'] as const;
+
+// Fetch function for React Query
+async function fetchPainEntries(): Promise<PainEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('pain_entries')
+    .select('*')
+    .order('timestamp', { ascending: false });
+
+  if (error) {
+    console.error('Failed to fetch entries:', error);
+    throw error;
+  }
+
+  return (data as DbPainEntry[]).map(dbToClient);
+}
+
+// Get current user helper
+async function getCurrentUser() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user;
+}
 
 export function usePainEntries(initialEntries: PainEntry[] = []) {
-  const [entries, setEntries] = useState<PainEntry[]>(initialEntries);
-  const [isLoaded, setIsLoaded] = useState(initialEntries.length > 0);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  const initializedRef = useRef(initialEntries.length > 0);
+  const queryClient = useQueryClient();
 
-  // Get or create client (only on client side)
-  const getSupabase = useCallback(() => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient();
-    }
-    return supabaseRef.current;
-  }, []);
+  // Main query with SSR hydration support
+  const { data: entries = [], isLoading, error } = useQuery({
+    queryKey: PAIN_ENTRIES_KEY,
+    queryFn: fetchPainEntries,
+    // Hydrate with SSR data if available
+    initialData: initialEntries.length > 0 ? initialEntries : undefined,
+    // Data is fresh for 30 seconds
+    staleTime: 30000,
+    // Refetch when window regains focus
+    refetchOnWindowFocus: true,
+    // Refetch when component mounts if data is stale
+    refetchOnMount: true,
+  });
 
-  // Get current user - middleware guarantees auth on protected routes
-  const getUser = useCallback(async () => {
-    const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-    return user;
-  }, [getSupabase]);
+  // Show error toast if query fails
+  if (error) {
+    toast({
+      title: 'Failed to load entries',
+      description: error instanceof Error ? error.message : 'Unknown error',
+      variant: 'destructive',
+    });
+  }
 
-  // Only fetch if no initial entries were provided (client-side navigation)
-  useEffect(() => {
-    // Skip fetch if we have initial entries from SSR
-    if (initializedRef.current) {
-      setIsLoaded(true);
-      return;
-    }
+  // Add entry mutation with optimistic update
+  const addMutation = useMutation({
+    mutationFn: async (entry: NewPainEntry): Promise<PainEntry> => {
+      const user = await getCurrentUser();
+      const supabase = createClient();
 
-    const fetchEntries = async () => {
-      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('pain_entries')
-        .select('*')
-        .order('timestamp', { ascending: false });
+        .insert({
+          ...clientToDb(entry),
+          user_id: user.id,
+        })
+        .select()
+        .single();
 
-      if (error) {
-        console.error('Failed to fetch entries:', error);
-        toast({
-          title: 'Failed to load entries',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        setEntries((data as DbPainEntry[]).map(dbToClient));
+      if (error) throw error;
+      return dbToClient(data as DbPainEntry);
+    },
+    onMutate: async (newEntry) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: PAIN_ENTRIES_KEY });
+
+      // Snapshot previous value
+      const previous = queryClient.getQueryData<PainEntry[]>(PAIN_ENTRIES_KEY);
+
+      // Optimistically update cache
+      const tempId = crypto.randomUUID();
+      const tempEntry: PainEntry = {
+        ...newEntry,
+        id: tempId,
+        timestamp: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) => [tempEntry, ...old]);
+
+      return { previous, tempId };
+    },
+    onError: (error, newEntry, context) => {
+      // Rollback on error
+      if (context?.previous) {
+        queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
       }
-      setIsLoaded(true);
-    };
-
-    fetchEntries();
-  }, [getSupabase]);
-
-  const addEntry = useCallback(async (entry: NewPainEntry): Promise<PainEntry> => {
-    const user = await getUser();
-    const supabase = getSupabase();
-
-    // Optimistic update
-    const tempId = crypto.randomUUID();
-    const tempEntry: PainEntry = {
-      ...entry,
-      id: tempId,
-      timestamp: new Date().toISOString(),
-    };
-    setEntries(prev => [tempEntry, ...prev]);
-
-    const { data, error } = await supabase
-      .from('pain_entries')
-      .insert({
-        ...clientToDb(entry),
-        user_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      // Rollback
-      setEntries(prev => prev.filter(e => e.id !== tempId));
       toast({
         title: 'Failed to save entry',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
-      throw error;
-    }
+    },
+    onSuccess: (newEntry, variables, context) => {
+      // Replace temp entry with real one
+      queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) =>
+        old.map(e => e.id === context?.tempId ? newEntry : e)
+      );
+    },
+  });
 
-    const newEntry = dbToClient(data as DbPainEntry);
-    // Replace temp entry with real one
-    setEntries(prev => prev.map(e => e.id === tempId ? newEntry : e));
-    return newEntry;
-  }, [getUser, getSupabase]);
+  // Update entry mutation with optimistic update
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<NewPainEntry> }): Promise<void> => {
+      const supabase = createClient();
 
-  const updateEntry = useCallback(async (id: string, updates: Partial<NewPainEntry>): Promise<void> => {
-    const supabase = getSupabase();
+      const dbUpdates: Partial<DbPainEntry> = {};
+      if (updates.painLevel !== undefined) dbUpdates.pain_level = updates.painLevel;
+      if (updates.locations !== undefined) dbUpdates.locations = updates.locations;
+      if (updates.types !== undefined) dbUpdates.types = updates.types;
+      if (updates.radiating !== undefined) dbUpdates.radiating = updates.radiating;
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
 
-    // Store previous state for rollback
-    const previousEntries = entries;
+      const { error } = await supabase
+        .from('pain_entries')
+        .update(dbUpdates)
+        .eq('id', id);
 
-    // Optimistic update
-    setEntries(prev => prev.map(entry =>
-      entry.id === id ? { ...entry, ...updates } : entry
-    ));
+      if (error) throw error;
+    },
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey: PAIN_ENTRIES_KEY });
+      const previous = queryClient.getQueryData<PainEntry[]>(PAIN_ENTRIES_KEY);
 
-    const dbUpdates: Partial<DbPainEntry> = {};
-    if (updates.painLevel !== undefined) dbUpdates.pain_level = updates.painLevel;
-    if (updates.locations !== undefined) dbUpdates.locations = updates.locations;
-    if (updates.types !== undefined) dbUpdates.types = updates.types;
-    if (updates.radiating !== undefined) dbUpdates.radiating = updates.radiating;
-    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+      queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) =>
+        old.map(entry => entry.id === id ? { ...entry, ...updates } : entry)
+      );
 
-    const { error } = await supabase
-      .from('pain_entries')
-      .update(dbUpdates)
-      .eq('id', id);
-
-    if (error) {
-      // Rollback
-      setEntries(previousEntries);
+      return { previous };
+    },
+    onError: (error, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
+      }
       toast({
         title: 'Failed to update entry',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
-      throw error;
-    }
-  }, [getSupabase, entries]);
+    },
+  });
 
-  const deleteEntry = useCallback(async (id: string): Promise<void> => {
-    const supabase = getSupabase();
+  // Delete entry mutation with optimistic update
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('pain_entries')
+        .delete()
+        .eq('id', id);
 
-    // Store for rollback
-    const previousEntries = entries;
+      if (error) throw error;
+    },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: PAIN_ENTRIES_KEY });
+      const previous = queryClient.getQueryData<PainEntry[]>(PAIN_ENTRIES_KEY);
 
-    // Optimistic update
-    setEntries(prev => prev.filter(entry => entry.id !== id));
+      queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) =>
+        old.filter(entry => entry.id !== id)
+      );
 
-    const { error } = await supabase
-      .from('pain_entries')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      // Rollback
-      setEntries(previousEntries);
+      return { previous };
+    },
+    onError: (error, id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
+      }
       toast({
         title: 'Failed to delete entry',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
-      throw error;
-    }
-  }, [getSupabase, entries]);
+    },
+  });
 
-  const clearAllEntries = useCallback(async (): Promise<void> => {
-    const user = await getUser();
-    const supabase = getSupabase();
+  // Clear all entries mutation
+  const clearAllMutation = useMutation({
+    mutationFn: async (): Promise<void> => {
+      const user = await getCurrentUser();
+      const supabase = createClient();
 
-    const previousEntries = entries;
-    setEntries([]);
+      const { error } = await supabase
+        .from('pain_entries')
+        .delete()
+        .eq('user_id', user.id);
 
-    const { error } = await supabase
-      .from('pain_entries')
-      .delete()
-      .eq('user_id', user.id);
+      if (error) throw error;
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: PAIN_ENTRIES_KEY });
+      const previous = queryClient.getQueryData<PainEntry[]>(PAIN_ENTRIES_KEY);
 
-    if (error) {
-      setEntries(previousEntries);
+      queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, []);
+
+      return { previous };
+    },
+    onError: (error, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
+      }
       toast({
         title: 'Failed to clear entries',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
-      throw error;
-    }
-  }, [getUser, getSupabase, entries]);
+    },
+  });
 
+  // Export to CSV (uses current entries from cache)
   const exportToCsv = useCallback(() => {
     const headers = ['Date', 'Time', 'Pain Level', 'Locations', 'Types', 'Radiating', 'Notes'];
     const rows = entries.map(entry => {
@@ -209,11 +250,12 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
   return {
     entries,
-    isLoaded,
-    addEntry,
-    updateEntry,
-    deleteEntry,
-    clearAllEntries,
+    isLoaded: !isLoading,
+    addEntry: (entry: NewPainEntry) => addMutation.mutateAsync(entry),
+    updateEntry: (id: string, updates: Partial<NewPainEntry>) =>
+      updateMutation.mutateAsync({ id, updates }),
+    deleteEntry: (id: string) => deleteMutation.mutateAsync(id),
+    clearAllEntries: () => clearAllMutation.mutateAsync(),
     exportToCsv,
   };
 }
