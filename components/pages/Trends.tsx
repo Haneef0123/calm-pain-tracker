@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays, isSameDay } from 'date-fns';
+import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
@@ -164,7 +164,7 @@ export default function Trends({ initialEntries }: TrendsProps) {
             <PageLayout>
                 <div className="pt-8 animate-fade-in">
                     <header className="mb-8">
-                        <h1 className="text-heading">Trends</h1>
+                        <h1 className="text-heading">Patterns</h1>
                     </header>
                     <div className="animate-pulse">
                         <div className="h-10 bg-muted rounded-sm mb-8 w-80" />

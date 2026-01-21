@@ -9,7 +9,7 @@ const navItems = [
   { path: '/', icon: Calendar, label: 'Today' },
   { path: '/history', icon: History, label: 'Past days' },
   { path: '/patterns', icon: TrendingUp, label: 'Patterns' },
-  { path: '/about', icon: Settings, label: 'About' },
+  { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function BottomNav() {
