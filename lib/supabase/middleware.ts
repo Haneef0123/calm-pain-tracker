@@ -40,22 +40,22 @@ export async function updateSession(request: NextRequest) {
     );
 
     const {
-        data: { user },
-    } = await supabase.auth.getUser();
+        data: { session },
+    } = await supabase.auth.getSession();
 
     // Allow sign-in page and auth callback without auth
     const isAuthRoute =
         request.nextUrl.pathname.startsWith('/sign-in') ||
         request.nextUrl.pathname.startsWith('/auth');
 
-    if (!user && !isAuthRoute) {
+    if (!session && !isAuthRoute) {
         const url = request.nextUrl.clone();
         url.pathname = '/sign-in';
         return NextResponse.redirect(url);
     }
 
     // Redirect authenticated users away from sign-in
-    if (user && request.nextUrl.pathname === '/sign-in') {
+    if (session && request.nextUrl.pathname === '/sign-in') {
         const url = request.nextUrl.clone();
         url.pathname = '/';
         return NextResponse.redirect(url);

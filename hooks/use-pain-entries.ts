@@ -25,12 +25,12 @@ async function fetchPainEntries(): Promise<PainEntry[]> {
   return (data as DbPainEntry[]).map(dbToClient);
 }
 
-// Get current user helper
-async function getCurrentUser() {
+// Get current user ID from session (middleware guarantees auth)
+async function getCurrentUserId(): Promise<string> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  return user;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) throw new Error('Not authenticated');
+  return session.user.id;
 }
 
 export function usePainEntries(initialEntries: PainEntry[] = []) {
@@ -62,14 +62,14 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Add entry mutation with optimistic update
   const addMutation = useMutation({
     mutationFn: async (entry: NewPainEntry): Promise<PainEntry> => {
-      const user = await getCurrentUser();
+      const userId = await getCurrentUserId();
       const supabase = createClient();
 
       const { data, error } = await supabase
         .from('pain_entries')
         .insert({
           ...clientToDb(entry),
-          user_id: user.id,
+          user_id: userId,
         })
         .select()
         .single();
@@ -96,7 +96,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
       return { previous, tempId };
     },
-    onError: (error, newEntry, context) => {
+    onError: (error, _newEntry, context) => {
       // Rollback on error
       if (context?.previous) {
         queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
@@ -144,7 +144,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
       return { previous };
     },
-    onError: (error, variables, context) => {
+    onError: (error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
       }
@@ -177,7 +177,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
       return { previous };
     },
-    onError: (error, id, context) => {
+    onError: (error, _id, context) => {
       if (context?.previous) {
         queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
       }
@@ -192,13 +192,13 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Clear all entries mutation
   const clearAllMutation = useMutation({
     mutationFn: async (): Promise<void> => {
-      const user = await getCurrentUser();
+      const userId = await getCurrentUserId();
       const supabase = createClient();
 
       const { error } = await supabase
         .from('pain_entries')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (error) throw error;
     },
@@ -210,7 +210,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
       return { previous };
     },
-    onError: (error, variables, context) => {
+    onError: (error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(PAIN_ENTRIES_KEY, context.previous);
       }
