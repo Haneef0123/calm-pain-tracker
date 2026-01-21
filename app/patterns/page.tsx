@@ -1,16 +1,15 @@
-import { createClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/supabase/auth';
 import Trends from '@/components/pages/Trends';
-import { DbPainEntry, dbToClient } from '@/types/pain-entry';
+import { getPainEntries } from '@/lib/data/pain-entries';
 
 export default async function PatternsPage() {
-    const supabase = await createClient();
+    const { data: { session } } = await getSession();
 
-    const { data } = await supabase
-        .from('pain_entries')
-        .select('*')
-        .order('timestamp', { ascending: false });
+    if (!session?.user) {
+        return <Trends initialEntries={[]} />;
+    }
 
-    const entries = (data as DbPainEntry[] | null)?.map(dbToClient) ?? [];
+    const entries = await getPainEntries(session.user.id, session.access_token);
 
     return <Trends initialEntries={entries} />;
 }

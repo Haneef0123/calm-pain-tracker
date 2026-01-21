@@ -1,12 +1,10 @@
-import { createClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/supabase/auth';
 import DailyEntry from '@/components/pages/DailyEntry';
 
 export default async function HomePage() {
-    const supabase = await createClient();
-    const { data: user } = await supabase.auth.getUser();
+    const { data: { session } } = await getSession();
 
-    // User is guaranteed by middleware, but TypeScript needs the check
-    if (!user.user) {
+    if (!session?.user) {
         return null;
     }
 

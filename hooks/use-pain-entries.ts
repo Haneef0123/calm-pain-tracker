@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
+import { revalidatePainEntries } from '@/lib/actions/revalidate';
 
 // Query key for React Query cache
 const PAIN_ENTRIES_KEY = ['pain-entries'] as const;
@@ -42,12 +43,16 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
     queryFn: fetchPainEntries,
     // Hydrate with SSR data if available
     initialData: initialEntries.length > 0 ? initialEntries : undefined,
-    // Data is fresh for 30 seconds
-    staleTime: 30000,
-    // Refetch when window regains focus
-    refetchOnWindowFocus: true,
-    // Refetch when component mounts if data is stale
-    refetchOnMount: true,
+    // Data is fresh for 5 minutes
+    staleTime: 5 * 60 * 1000,
+    // Keep unused data in cache for 10 minutes
+    gcTime: 10 * 60 * 1000,
+    // Only refetch on focus if data is stale
+    refetchOnWindowFocus: (query) => {
+      return query.state.dataUpdateCount > 0 && query.isStaleByTime();
+    },
+    // Don't refetch on mount if we have initial data (SSR)
+    refetchOnMount: initialEntries.length > 0 ? false : true,
   });
 
   // Show error toast if query fails
@@ -107,11 +112,13 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
         variant: 'destructive',
       });
     },
-    onSuccess: (newEntry, variables, context) => {
+    onSuccess: async (newEntry, variables, context) => {
       // Replace temp entry with real one
       queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) =>
         old.map(e => e.id === context?.tempId ? newEntry : e)
       );
+      // Invalidate server cache
+      await revalidatePainEntries();
     },
   });
 
@@ -154,6 +161,9 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
         variant: 'destructive',
       });
     },
+    onSuccess: async () => {
+      await revalidatePainEntries();
+    },
   });
 
   // Delete entry mutation with optimistic update
@@ -187,6 +197,9 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
         variant: 'destructive',
       });
     },
+    onSuccess: async () => {
+      await revalidatePainEntries();
+    },
   });
 
   // Clear all entries mutation
@@ -219,6 +232,9 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
+    },
+    onSuccess: async () => {
+      await revalidatePainEntries();
     },
   });
 

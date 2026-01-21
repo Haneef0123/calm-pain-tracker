@@ -1,22 +1,20 @@
-import { createClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/supabase/auth';
 import Settings from '@/components/pages/Settings';
-import { DbPainEntry, dbToClient } from '@/types/pain-entry';
+import { getPainEntries } from '@/lib/data/pain-entries';
 
 export default async function SettingsPage() {
-    const supabase = await createClient();
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: { session } } = await getSession();
 
-    const { data } = await supabase
-        .from('pain_entries')
-        .select('*')
-        .order('timestamp', { ascending: false });
+    if (!session?.user) {
+        return <Settings initialEntries={[]} userEmail={null} />;
+    }
 
-    const entries = (data as DbPainEntry[] | null)?.map(dbToClient) ?? [];
+    const entries = await getPainEntries(session.user.id, session.access_token);
 
     return (
         <Settings
             initialEntries={entries}
-            userEmail={userData.user?.email ?? null}
+            userEmail={session.user.email ?? null}
         />
     );
 }
