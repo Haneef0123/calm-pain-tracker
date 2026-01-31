@@ -1,4 +1,9 @@
 {
     "framework": "nextjs",
-    "installCommand": "yarn install"
+    "installCommand": "yarn install",
+    "functions": {
+        "app/**": {
+            "regions": ["bom1"]
+        }
+    }
 }

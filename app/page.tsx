@@ -1,12 +1,6 @@
-import { getSession } from '@/lib/supabase/auth';
 import DailyEntry from '@/components/pages/DailyEntry';
 
-export default async function HomePage() {
-    const { data: { session } } = await getSession();
-
-    if (!session?.user) {
-        return null;
-    }
-
+// Static page: auth gating is handled by middleware redirects.
+export default function HomePage() {
     return <DailyEntry />;
 }

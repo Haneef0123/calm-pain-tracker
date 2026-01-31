@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
@@ -24,17 +24,29 @@ import {
 import type { PainEntry } from '@/types/pain-entry';
 
 interface SettingsProps {
-    initialEntries: PainEntry[];
-    userEmail: string | null;
+    initialEntries?: PainEntry[];
+    userEmail?: string | null;
 }
 
-export default function Settings({ initialEntries, userEmail }: SettingsProps) {
+export default function Settings({ initialEntries = [], userEmail = null }: SettingsProps) {
     const { entries, exportToCsv, clearAllEntries } = usePainEntries(initialEntries);
     const { signOut } = useAuth();
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(userEmail);
     const supabase = createClient();
+
+    // Get user email client-side if not provided via SSR
+    useEffect(() => {
+        if (!currentUserEmail) {
+            supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user?.email) {
+                    setCurrentUserEmail(user.email);
+                }
+            });
+        }
+    }, [currentUserEmail, supabase]);
 
     const handleExport = () => {
         if (entries.length === 0) {
@@ -120,7 +132,7 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                 <div className="h-px bg-border my-6" />
 
                 <div className="mb-8">
-                    <AccountInfo email={userEmail} entryCount={entries.length} />
+                    <AccountInfo email={currentUserEmail} entryCount={entries.length} />
                 </div>
 
                 <div className="space-y-4">

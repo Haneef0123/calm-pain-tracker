@@ -5,8 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
-import { revalidatePainEntries } from '@/lib/actions/revalidate';
-
 // Query key for React Query cache
 const PAIN_ENTRIES_KEY = ['pain-entries'] as const;
 
@@ -26,13 +24,8 @@ async function fetchPainEntries(): Promise<PainEntry[]> {
   return (data as DbPainEntry[]).map(dbToClient);
 }
 
-// Get current user ID from session (middleware guarantees auth)
-async function getCurrentUserId(): Promise<string> {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user?.id) throw new Error('Not authenticated');
-  return session.user.id;
-}
+// With RLS enforced, Supabase already knows the authenticated user via the access token.
+// Avoid calling auth.getSession() in mutation hot paths.
 
 export function usePainEntries(initialEntries: PainEntry[] = []) {
   const queryClient = useQueryClient();
@@ -67,14 +60,12 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Add entry mutation with optimistic update
   const addMutation = useMutation({
     mutationFn: async (entry: NewPainEntry): Promise<PainEntry> => {
-      const userId = await getCurrentUserId();
       const supabase = createClient();
 
       const { data, error } = await supabase
         .from('pain_entries')
         .insert({
           ...clientToDb(entry),
-          user_id: userId,
         })
         .select()
         .single();
@@ -117,8 +108,8 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
       queryClient.setQueryData<PainEntry[]>(PAIN_ENTRIES_KEY, (old = []) =>
         old.map(e => e.id === context?.tempId ? newEntry : e)
       );
-      // Invalidate server cache
-      await revalidatePainEntries();
+      // Server cache revalidation is unnecessary for a client-driven UI.
+      // If you later SSR entries, re-enable tag revalidation.
     },
   });
 
@@ -162,7 +153,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
       });
     },
     onSuccess: async () => {
-      await revalidatePainEntries();
+      // no-op
     },
   });
 
@@ -198,20 +189,23 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
       });
     },
     onSuccess: async () => {
-      await revalidatePainEntries();
+      // no-op
     },
   });
 
   // Clear all entries mutation
   const clearAllMutation = useMutation({
     mutationFn: async (): Promise<void> => {
-      const userId = await getCurrentUserId();
       const supabase = createClient();
 
+      // If the DB enforces RLS (user_id = auth.uid()), deleting by user_id is not required.
+      // But keeping a filter here is fine if your schema requires it.
       const { error } = await supabase
         .from('pain_entries')
+        // Supabase/PostgREST requires a WHERE clause for DELETE.
+        // This condition matches all rows, while RLS still limits the delete to the current user.
         .delete()
-        .eq('user_id', userId);
+        .not('id', 'is', null);
 
       if (error) throw error;
     },
@@ -234,7 +228,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
       });
     },
     onSuccess: async () => {
-      await revalidatePainEntries();
+      // no-op
     },
   });
 

@@ -1,4 +1,3 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 function parseJwtPayload(token: string): { exp?: number; sub?: string } | null {
@@ -78,64 +77,35 @@ function getSessionFromCookies(request: NextRequest): { isValid: boolean; userId
 }
 
 export async function updateSession(request: NextRequest) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        console.warn('Supabase environment variables not configured');
-        return NextResponse.next({ request });
-    }
-
     const isAuthRoute =
         request.nextUrl.pathname.startsWith('/sign-in') ||
         request.nextUrl.pathname.startsWith('/auth');
 
-    let supabaseResponse = NextResponse.next({ request });
+    // NOTE: Keep middleware edge-fast:
+    // - no Supabase client creation
+    // - no network calls (no getSession/getUser)
+    // Middleware is only responsible for routing/redirects.
 
-    const supabase = createServerClient(
-        supabaseUrl,
-        supabaseAnonKey,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    );
-                    supabaseResponse = NextResponse.next({ request });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    );
-                },
-            },
-        }
-    );
+    // Allow auth routes to proceed so OAuth callbacks can complete.
+    if (isAuthRoute) {
+        return NextResponse.next({ request });
+    }
 
     const { isValid } = getSessionFromCookies(request);
 
+    // Not authenticated (or token is expiring soon) => send to sign-in.
     if (!isValid) {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session && !isAuthRoute) {
-            const url = request.nextUrl.clone();
-            url.pathname = '/sign-in';
-            return NextResponse.redirect(url);
-        }
-
-        if (session && request.nextUrl.pathname === '/sign-in') {
-            const url = request.nextUrl.clone();
-            url.pathname = '/';
-            return NextResponse.redirect(url);
-        }
-    } else {
-        if (request.nextUrl.pathname === '/sign-in') {
-            const url = request.nextUrl.clone();
-            url.pathname = '/';
-            return NextResponse.redirect(url);
-        }
+        const url = request.nextUrl.clone();
+        url.pathname = '/sign-in';
+        return NextResponse.redirect(url);
     }
 
-    return supabaseResponse;
+    // Already authenticated => keep users out of sign-in.
+    if (request.nextUrl.pathname === '/sign-in') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+    }
+
+    return NextResponse.next({ request });
 }

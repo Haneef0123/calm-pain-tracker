@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Calendar, History, TrendingUp, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,34 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Prefetch primary routes after idle so tab switching feels instant.
+  useEffect(() => {
+    const prefetch = () => {
+      navItems.forEach(({ path }) => {
+        if (path !== pathname) {
+          router.prefetch(path);
+        }
+      });
+    };
+
+    // Avoid prefetching immediately on slow networks.
+    const conn = (navigator as any).connection;
+    const isSaveData = !!conn?.saveData;
+    const is2g = typeof conn?.effectiveType === 'string' && conn.effectiveType.includes('2g');
+
+    if (isSaveData || is2g) return;
+
+    const id = (window as any).requestIdleCallback
+      ? (window as any).requestIdleCallback(prefetch, { timeout: 1500 })
+      : window.setTimeout(prefetch, 800);
+
+    return () => {
+      if ((window as any).cancelIdleCallback) (window as any).cancelIdleCallback(id);
+      else clearTimeout(id);
+    };
+  }, [router, pathname]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border pb-safe-bottom">
@@ -24,6 +53,9 @@ export function BottomNav() {
             <Link
               key={path}
               href={path}
+              prefetch
+              onMouseEnter={() => router.prefetch(path)}
+              onTouchStart={() => router.prefetch(path)}
               className={cn(
                 'flex flex-col items-center justify-center flex-1 h-full transition-opacity duration-100',
                 isActive ? 'opacity-100' : 'opacity-50 hover:opacity-75'

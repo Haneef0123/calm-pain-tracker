@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as Sonner } from '@/components/ui/sonner';
+import dynamic from 'next/dynamic';
+
+const TooltipProvider = dynamic(() => import('@/components/ui/tooltip').then(m => m.TooltipProvider), { ssr: false });
+const Toaster = dynamic(() => import('@/components/ui/toaster').then(m => m.Toaster), { ssr: false });
+const Sonner = dynamic(() => import('@/components/ui/sonner').then(m => m.Toaster), { ssr: false });
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { PerfObserver } from '@/components/perf/PerfObserver';
 
 export function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(() => new QueryClient({
@@ -17,10 +20,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 gcTime: 10 * 60 * 1000,
                 // Retry failed requests once
                 retry: 1,
-                // Refetch on window focus for fresh data
-                refetchOnWindowFocus: true,
-                // Don't refetch on mount if data is fresh
-                refetchOnMount: true,
+                // Avoid surprise refetches that make navigation feel slow.
+                refetchOnWindowFocus: false,
+                // Only refetch on mount when data is stale (default behavior).
+                refetchOnMount: false,
                 // Memory efficiency
                 structuralSharing: true,
             },
@@ -33,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <QueryClientProvider client={queryClient}>
+            {process.env.NODE_ENV === 'development' ? <PerfObserver /> : null}
             <AuthProvider>
                 <TooltipProvider>
                     <Toaster />

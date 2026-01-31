@@ -4,13 +4,29 @@ import { useState, useMemo } from 'react';
 import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
+import dynamic from 'next/dynamic';
+
+const TrendsChart = dynamic(
+    () => import('./TrendsChart').then((m) => m.TrendsChart),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="bg-card border border-border rounded-sm p-4 mb-8 animate-pulse">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="h-4 w-24 bg-muted rounded" />
+                    <div className="h-4 w-12 bg-muted rounded" />
+                </div>
+                <div className="h-64 md:h-80 bg-muted rounded-sm" />
+            </div>
+        ),
+    }
+);
 import { StatsCard } from '@/components/pain/StatsCard';
 import { TimeRangeSelector, type TimeRange } from '@/components/pain/TimeRangeSelector';
 import type { PainEntry } from '@/types/pain-entry';
 
 interface TrendsProps {
-    initialEntries: PainEntry[];
+    initialEntries?: PainEntry[];
 }
 
 interface ChartDataPoint {
@@ -23,7 +39,7 @@ interface ChartDataPoint {
     notes: string;
 }
 
-export default function Trends({ initialEntries }: TrendsProps) {
+export default function Trends({ initialEntries = [] }: TrendsProps) {
     const { entries, isLoaded } = usePainEntries(initialEntries);
     const [range, setRange] = useState<TimeRange>('7d');
 
@@ -211,55 +227,12 @@ export default function Trends({ initialEntries }: TrendsProps) {
 
                         {/* Chart */}
                         {chartData.length > 1 ? (
-                            <div className="bg-card border border-border rounded-sm p-4 mb-8">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-sm font-medium text-muted-foreground">Pain Level</h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        {chartData.length} {chartData.length === 1 ? 'entry' : 'entries'}
-                                    </p>
-                                </div>
-                                <div className="h-64 md:h-80" role="img" aria-label={`Pain level chart showing ${chartData.length} entries over ${rangeLabel}`}>
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                stroke="hsl(var(--border))"
-                                                vertical={false}
-                                                opacity={0.3}
-                                            />
-                                            <XAxis
-                                                dataKey="date"
-                                                axisLine={false}
-                                                tickLine={false}
-                                                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                                                interval="preserveStartEnd"
-                                                height={40}
-                                            />
-                                            <YAxis
-                                                domain={[0, 10]}
-                                                axisLine={false}
-                                                tickLine={false}
-                                                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                                                ticks={[0, 2, 4, 6, 8, 10]}
-                                                width={30}
-                                            />
-                                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="pain"
-                                                stroke="hsl(var(--foreground))"
-                                                strokeWidth={2}
-                                                dot={<CustomDot />}
-                                                activeDot={{ r: 6, strokeWidth: 2 }}
-                                                animationDuration={300}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                <p className="text-xs text-muted-foreground text-center mt-2">
-                                    Lines connect recorded entries &bull; Tap points for details
-                                </p>
-                            </div>
+                            <TrendsChart
+                                chartData={chartData}
+                                rangeLabel={rangeLabel}
+                                CustomTooltip={CustomTooltip}
+                                CustomDot={CustomDot}
+                            />
                         ) : (
                             <div className="bg-card border border-border rounded-sm p-8 text-center">
                                 <p className="text-muted-foreground">Patterns need time. A few more days will make this clearer.</p>

@@ -7,10 +7,10 @@ import { HistoryEntryCard } from '@/components/pain/HistoryEntryCard';
 import type { PainEntry } from '@/types/pain-entry';
 
 interface HistoryProps {
-    initialEntries: PainEntry[];
+    initialEntries?: PainEntry[];
 }
 
-export default function History({ initialEntries }: HistoryProps) {
+export default function History({ initialEntries = [] }: HistoryProps) {
     const { entries, deleteEntry } = usePainEntries(initialEntries);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
