@@ -3,9 +3,10 @@ import History from '@/components/pages/History';
 import { getPainEntries } from '@/lib/data/pain-entries';
 
 export default async function HistoryPage() {
-    const { data: { session } } = await getSession();
+    // Single call to getSession - contains both session and user info
+    const { data: { session }, error } = await getSession();
 
-    if (!session?.user) {
+    if (!session?.user || error) {
         return <History initialEntries={[]} />;
     }
 

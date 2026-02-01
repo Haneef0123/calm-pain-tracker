@@ -24,12 +24,15 @@ import {
 import type { PainEntry } from '@/types/pain-entry';
 
 interface SettingsProps {
-    initialEntries: PainEntry[];
+    entryCount: number;
     userEmail: string | null;
 }
 
-export default function Settings({ initialEntries, userEmail }: SettingsProps) {
-    const { entries, exportToCsv, clearAllEntries } = usePainEntries(initialEntries);
+export default function Settings({ entryCount, userEmail }: SettingsProps) {
+    // Use hook without initial data - it will fetch on demand when needed
+    const { entries, exportToCsv, clearAllEntries } = usePainEntries();
+    // Use the SSR-provided count for display, or fall back to client-fetched length
+    const displayCount = entries.length > 0 ? entries.length : entryCount;
     const { signOut } = useAuth();
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
@@ -120,7 +123,7 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                 <div className="h-px bg-border my-6" />
 
                 <div className="mb-8">
-                    <AccountInfo email={userEmail} entryCount={entries.length} />
+                    <AccountInfo email={userEmail} entryCount={displayCount} />
                 </div>
 
                 <div className="space-y-4">
@@ -147,7 +150,7 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Clear all entries?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete all {entries.length} pain entries.
+                                    This will permanently delete all {displayCount} pain entries.
                                     Consider exporting your data first. This action cannot be undone.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
@@ -189,7 +192,7 @@ export default function Settings({ initialEntries, userEmail }: SettingsProps) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Delete your account?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete your account and all {entries.length} pain entries.
+                                    This will permanently delete your account and all {displayCount} pain entries.
                                     This action cannot be undone.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
