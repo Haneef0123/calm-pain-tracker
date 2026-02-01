@@ -26,33 +26,34 @@ async function fetchPainEntries(): Promise<PainEntry[]> {
   return (data as DbPainEntry[]).map(dbToClient);
 }
 
-// Get current user ID from session (middleware guarantees auth)
+// Get current user ID from authenticated user (more secure than session)
 async function getCurrentUserId(): Promise<string> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user?.id) throw new Error('Not authenticated');
-  return session.user.id;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (!user || error) throw new Error('Not authenticated');
+  return user.id;
 }
 
 export function usePainEntries(initialEntries: PainEntry[] = []) {
   const queryClient = useQueryClient();
+  const hasInitialData = initialEntries.length > 0;
 
   // Main query with SSR hydration support
-  const { data: entries = [], isLoading, error } = useQuery({
+  const { data: entries = [], isLoading, isFetching, error } = useQuery({
     queryKey: PAIN_ENTRIES_KEY,
     queryFn: fetchPainEntries,
     // Hydrate with SSR data if available
-    initialData: initialEntries.length > 0 ? initialEntries : undefined,
+    initialData: hasInitialData ? initialEntries : undefined,
+    initialDataUpdatedAt: hasInitialData ? Date.now() : undefined,
+
     // Data is fresh for 5 minutes
     staleTime: 5 * 60 * 1000,
     // Keep unused data in cache for 10 minutes
     gcTime: 10 * 60 * 1000,
-    // Only refetch on focus if data is stale
-    refetchOnWindowFocus: (query) => {
-      return query.state.dataUpdateCount > 0 && query.isStaleByTime();
-    },
-    // Don't refetch on mount if we have initial data (SSR)
-    refetchOnMount: initialEntries.length > 0 ? false : true,
+    // Prevent ALL refetches when we have SSR data
+    refetchOnMount: hasInitialData ? false : true,
+    refetchOnWindowFocus: false, // Never refetch on window focus - mutations handle updates
+    refetchOnReconnect: false,
   });
 
   // Show error toast if query fails
@@ -264,9 +265,16 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
     URL.revokeObjectURL(url);
   }, [entries]);
 
+  // isLoaded is true if:
+  // 1. We have SSR data (initialEntries) - always ready to render
+  // 2. OR we're not in initial loading state (!isLoading)
+  // This prevents the loading flicker when navigating between pages
+  const isLoaded = hasInitialData || !isLoading;
+
   return {
     entries,
-    isLoaded: !isLoading,
+    isLoaded,
+    isFetching, // Expose for debugging/UI if needed
     addEntry: (entry: NewPainEntry) => addMutation.mutateAsync(entry),
     updateEntry: (id: string, updates: Partial<NewPainEntry>) =>
       updateMutation.mutateAsync({ id, updates }),

@@ -17,10 +17,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 gcTime: 10 * 60 * 1000,
                 // Retry failed requests once
                 retry: 1,
-                // Refetch on window focus for fresh data
-                refetchOnWindowFocus: true,
-                // Don't refetch on mount if data is fresh
-                refetchOnMount: true,
+                refetchOnWindowFocus: false,
+                refetchOnMount: false,
+                refetchOnReconnect: false,
                 // Memory efficiency
                 structuralSharing: true,
             },
