@@ -11,7 +11,7 @@ export default async function PatternsPage() {
         return <Trends initialEntries={[]} />;
     }
 
-    // Now fetch entries - only ONE Supabase call instead of TWO auth calls + data call
+    // Fetch entries - now just ONE auth call + data call (was TWO auth calls + data call)
     const entries = await getPainEntries(session.user.id, session.access_token);
 
     return <Trends initialEntries={entries} />;

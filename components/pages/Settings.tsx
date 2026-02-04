@@ -31,7 +31,8 @@ interface SettingsProps {
 export default function Settings({ entryCount, userEmail }: SettingsProps) {
     // Use hook without initial data - it will fetch on demand when needed
     const { entries, exportToCsv, clearAllEntries } = usePainEntries();
-    // Use the SSR-provided count for display, or fall back to client-fetched length
+    // Client data takes precedence over SSR count (reflects mutations like add/delete)
+    // Falls back to SSR count before client data loads (avoids loading state)
     const displayCount = entries.length > 0 ? entries.length : entryCount;
     const { signOut } = useAuth();
     const router = useRouter();
