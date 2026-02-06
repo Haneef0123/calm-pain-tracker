@@ -1,0 +1,47 @@
+---
+description: Never create summary or documentation files unless explicitly requested
+alwaysApply: true
+---
+
+# No Summary or Documentation Files
+
+## Rule
+
+**NEVER create summary files, documentation files, or similar helper files unless the user explicitly asks for them.**
+
+### Prohibited File Types
+
+Do NOT create files like:
+- `*_SUMMARY.md`
+- `*_GUIDE.md`
+- `HOW_TO_*.md`
+- `*_LOG.txt`
+- `*_REPORT.md`
+- `README.md` (unless explicitly requested)
+- Any documentation or summary files
+
+### When to Create Files
+
+Only create such files when:
+- The user explicitly asks: "create a summary", "write a guide", "document this", etc.
+- The user specifically requests a README or documentation file
+
+### Default Behavior
+
+When completing tasks:
+- ✅ Provide information directly in the conversation
+- ✅ Use existing files for code/logs/data
+- ❌ Do NOT create new summary/documentation files
+- ❌ Do NOT create helper files "for future reference"
+
+### Examples
+
+**❌ BAD:**
+- "I've created a summary file for you..."
+- Creating `LOGS_SUMMARY.md` after fetching logs
+- Creating `HOW_TO_GET_API_TOKENS.md` when explaining how to get tokens
+
+**✅ GOOD:**
+- "Here's what I found: [information directly in response]"
+- "To get the token: [instructions in conversation]"
+- Only creating files when user says "save this to a file" or "create documentation"
