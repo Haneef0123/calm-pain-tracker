@@ -78,6 +78,12 @@ function getSessionFromCookies(request: NextRequest): { isValid: boolean; userId
 }
 
 export async function updateSession(request: NextRequest) {
+    // E2E Test Mode: Bypass auth for Playwright testing
+    // Set NEXT_PUBLIC_E2E_TEST_MODE=true in .env.local to enable
+    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true') {
+        return NextResponse.next({ request });
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

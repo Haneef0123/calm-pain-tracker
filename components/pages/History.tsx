@@ -22,7 +22,7 @@ export default function History({ initialEntries }: HistoryProps) {
                         <h1 className="text-heading">Past days</h1>
                     </header>
                     <div className="text-center py-16">
-                        <p className="text-muted-foreground">Once you log a few days, patterns will start to appear here.</p>
+                        <p className="text-muted-foreground">No entries yet. Start tracking today!</p>
                     </div>
                 </div>
             </PageLayout>
