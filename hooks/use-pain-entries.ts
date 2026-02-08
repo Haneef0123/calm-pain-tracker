@@ -3,15 +3,35 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
-import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
+import {
+  PainEntry,
+  DbPainEntry,
+  NewPainEntry,
+  dbToClient,
+  clientToDb,
+  isDiscEntry,
+  getPrimaryDisc,
+  getSecondaryDiscs,
+  getSensationLabel,
+  getRadiationLabel,
+  getAggravatorLabel,
+  getNeuroSignLabel,
+} from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
 import { revalidatePainEntries } from '@/lib/actions/revalidate';
+import { isE2ETestMode, getMockEntries } from '@/lib/e2e/mock-data';
 
 // Query key for React Query cache
 const PAIN_ENTRIES_KEY = ['pain-entries'] as const;
 
 // Fetch function for React Query
 async function fetchPainEntries(): Promise<PainEntry[]> {
+  // E2E Test Mode: Return mock data
+  if (isE2ETestMode()) {
+    console.log('[E2E] Using mock pain entries');
+    return getMockEntries();
+  }
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from('pain_entries')
@@ -28,6 +48,11 @@ async function fetchPainEntries(): Promise<PainEntry[]> {
 
 // Get current user ID from authenticated user (more secure than session)
 async function getCurrentUserId(): Promise<string> {
+  // E2E Test Mode: Return mock user ID
+  if (isE2ETestMode()) {
+    return 'e2e-test-user-id';
+  }
+
   const supabase = createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (!user || error) throw new Error('Not authenticated');
@@ -68,6 +93,16 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Add entry mutation with optimistic update
   const addMutation = useMutation({
     mutationFn: async (entry: NewPainEntry): Promise<PainEntry> => {
+      // E2E Test Mode: Return mock entry without database insert
+      if (isE2ETestMode()) {
+        console.log('[E2E] Mock add entry:', entry);
+        return {
+          ...entry,
+          id: `e2e-new-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
       const userId = await getCurrentUserId();
       const supabase = createClient();
 
@@ -126,14 +161,28 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Update entry mutation with optimistic update
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<NewPainEntry> }): Promise<void> => {
+      // E2E Test Mode: Skip database update
+      if (isE2ETestMode()) {
+        console.log('[E2E] Mock update entry:', id, updates);
+        return;
+      }
+
       const supabase = createClient();
 
       const dbUpdates: Partial<DbPainEntry> = {};
+      // Legacy fields
       if (updates.painLevel !== undefined) dbUpdates.pain_level = updates.painLevel;
       if (updates.locations !== undefined) dbUpdates.locations = updates.locations;
       if (updates.types !== undefined) dbUpdates.types = updates.types;
       if (updates.radiating !== undefined) dbUpdates.radiating = updates.radiating;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+      // New disc-focused fields
+      if (updates.spineRegion !== undefined) dbUpdates.spine_region = updates.spineRegion;
+      if (updates.discs !== undefined) dbUpdates.discs = updates.discs;
+      if (updates.sensations !== undefined) dbUpdates.sensations = updates.sensations;
+      if (updates.radiation !== undefined) dbUpdates.radiation = updates.radiation;
+      if (updates.aggravatingPositions !== undefined) dbUpdates.aggravating_positions = updates.aggravatingPositions;
+      if (updates.neurologicalSigns !== undefined) dbUpdates.neurological_signs = updates.neurologicalSigns;
 
       const { error } = await supabase
         .from('pain_entries')
@@ -170,6 +219,12 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
   // Delete entry mutation with optimistic update
   const deleteMutation = useMutation({
     mutationFn: async (id: string): Promise<void> => {
+      // E2E Test Mode: Skip database delete
+      if (isE2ETestMode()) {
+        console.log('[E2E] Mock delete entry:', id);
+        return;
+      }
+
       const supabase = createClient();
       const { error } = await supabase
         .from('pain_entries')
@@ -241,18 +296,59 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
 
   // Export to CSV (uses current entries from cache)
   const exportToCsv = useCallback(() => {
-    const headers = ['Date', 'Time', 'Pain Level', 'Locations', 'Types', 'Radiating', 'Notes'];
-    const rows = entries.map(entry => {
+    // New CSV format with disc-focused columns
+    const headers = [
+      'Date',
+      'Time',
+      'Spine Region',
+      'Primary Disc',
+      'Secondary Discs',
+      'Pain Level',
+      'Sensations',
+      'Radiation',
+      'Aggravators',
+      'Neurological Signs',
+      'Notes',
+    ];
+
+    const rows = entries.map((entry) => {
       const date = new Date(entry.timestamp);
-      return [
-        date.toLocaleDateString(),
-        date.toLocaleTimeString(),
-        entry.painLevel,
-        entry.locations.join('; '),
-        entry.types.join('; '),
-        entry.radiating ? 'Yes' : 'No',
-        `"${entry.notes.replace(/"/g, '""')}"`,
-      ].join(',');
+      const isDisc = isDiscEntry(entry);
+
+      if (isDisc) {
+        // New disc-focused entry
+        const primaryDisc = getPrimaryDisc(entry);
+        const secondaryDiscs = getSecondaryDiscs(entry);
+
+        return [
+          date.toLocaleDateString(),
+          date.toLocaleTimeString(),
+          entry.spineRegion ?? '',
+          primaryDisc?.level ?? '',
+          secondaryDiscs.map((d) => d.level).join('; ') || '-',
+          entry.painLevel,
+          entry.sensations?.map(getSensationLabel).join('; ') || '-',
+          entry.radiation?.map(getRadiationLabel).join('; ') || '-',
+          entry.aggravatingPositions?.map(getAggravatorLabel).join('; ') || '-',
+          entry.neurologicalSigns?.map(getNeuroSignLabel).join('; ') || '-',
+          `"${(entry.notes || '').replace(/"/g, '""')}"`,
+        ].join(',');
+      } else {
+        // Legacy entry format
+        return [
+          date.toLocaleDateString(),
+          date.toLocaleTimeString(),
+          'N/A', // Spine Region
+          '-', // Primary Disc
+          '-', // Secondary Discs
+          entry.painLevel,
+          entry.types?.join('; ') || '-', // Map types to sensations column
+          entry.radiating ? 'Yes' : 'No', // Map radiating to radiation column
+          '-', // Aggravators
+          '-', // Neurological Signs
+          `"${(entry.notes || '').replace(/"/g, '""')}"`,
+        ].join(',');
+      }
     });
 
     const csv = [headers.join(','), ...rows].join('\n');
