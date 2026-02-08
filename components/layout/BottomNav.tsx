@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, History, TrendingUp, Settings } from 'lucide-react';
+import { Calendar, History, TrendingUp, Settings, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', icon: Calendar, label: 'Today' },
   { path: '/history', icon: History, label: 'Past days' },
   { path: '/patterns', icon: TrendingUp, label: 'Patterns' },
+  { path: '/pricing', icon: Sparkles, label: 'Pricing' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

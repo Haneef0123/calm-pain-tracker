@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import { StatsCard } from '@/components/pain/StatsCard';
 import { TimeRangeSelector, type TimeRange } from '@/components/pain/TimeRangeSelector';
+import { usePaywall } from '@/hooks/use-paywall';
+import { UpgradeDialog } from '@/components/subscription/UpgradeDialog';
+import { trackClientEvent } from '@/lib/analytics/client';
 import type { PainEntry } from '@/types/pain-entry';
 
 interface TrendsProps {
@@ -25,18 +28,29 @@ interface ChartDataPoint {
 
 export default function Trends({ initialEntries }: TrendsProps) {
     const { entries, isLoaded } = usePainEntries(initialEntries);
+    const paywall = usePaywall('advanced_trends');
     const [range, setRange] = useState<TimeRange>('7d');
+    const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+
+    useEffect(() => {
+        if (!paywall.allowed && (range === '30d' || range === 'all')) {
+            setRange('7d');
+        }
+    }, [paywall.allowed, range]);
+
+    const effectiveRange: TimeRange = paywall.allowed ? range : '7d';
+    const lockedRanges: TimeRange[] = paywall.allowed ? [] : ['30d', 'all'];
 
     const filteredEntries = useMemo(() => {
-        if (range === 'all') return entries;
+        if (effectiveRange === 'all') return entries;
 
-        const days = range === '7d' ? 7 : 30;
+        const days = effectiveRange === '7d' ? 7 : 30;
         const cutoff = subDays(new Date(), days);
 
         return entries.filter(entry =>
             isAfter(parseISO(entry.timestamp), cutoff)
         );
-    }, [entries, range]);
+    }, [entries, effectiveRange]);
 
     const chartData = useMemo(() => {
         const reversed = [...filteredEntries].reverse();
@@ -104,10 +118,10 @@ export default function Trends({ initialEntries }: TrendsProps) {
     }, [filteredEntries]);
 
     const rangeLabel = useMemo(() => {
-        if (range === '7d') return 'last 7 days';
-        if (range === '30d') return 'last 30 days';
+        if (effectiveRange === '7d') return 'last 7 days';
+        if (effectiveRange === '30d') return 'last 30 days';
         return 'all time';
-    }, [range]);
+    }, [effectiveRange]);
 
     // Custom tooltip component
     const CustomTooltip = ({ active, payload }: any) => {
@@ -189,7 +203,23 @@ export default function Trends({ initialEntries }: TrendsProps) {
 
                 {/* Time range selector */}
                 <div className="mb-8">
-                    <TimeRangeSelector value={range} onChange={setRange} />
+                    <TimeRangeSelector
+                        value={effectiveRange}
+                        onChange={setRange}
+                        lockedValues={lockedRanges}
+                        onLockedSelect={async (lockedRange) => {
+                            await trackClientEvent('paywall_viewed', {
+                                feature: 'advanced_trends',
+                                attemptedRange: lockedRange,
+                            });
+                            setIsUpgradeOpen(true);
+                        }}
+                    />
+                    {!paywall.allowed ? (
+                        <p className="text-xs text-muted-foreground mt-2">
+                            30-day and all-time trends are part of Pro.
+                        </p>
+                    ) : null}
                 </div>
 
                 {entries.length === 0 ? (
@@ -268,6 +298,12 @@ export default function Trends({ initialEntries }: TrendsProps) {
                     </>
                 )}
             </div>
+            <UpgradeDialog
+                open={isUpgradeOpen}
+                onOpenChange={setIsUpgradeOpen}
+                title="Unlock advanced trends"
+                description={paywall.reason || 'Upgrade to Pro to view longer trend windows.'}
+            />
         </PageLayout>
     );
 }

@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { usePainEntries } from '@/hooks/use-pain-entries';
+import { useSubscription } from '@/hooks/use-subscription';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
-import { Download, Trash2, LogOut, UserX } from 'lucide-react';
+import { Download, Trash2, LogOut, UserX, Sparkles } from 'lucide-react';
 import { AccountInfo } from '@/components/pain/AccountInfo';
+import { SubscriptionBadge } from '@/components/subscription/SubscriptionBadge';
+import { ManageSubscriptionButton } from '@/components/subscription/ManageSubscriptionButton';
+import { UpgradeDialog } from '@/components/subscription/UpgradeDialog';
+import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -35,9 +40,21 @@ export default function Settings({ entryCount, userEmail }: SettingsProps) {
     const displayCount = entries.length > 0 ? entries.length : entryCount;
     const { signOut } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
     const supabase = createClient();
+    const { planType, status, isPro } = useSubscription();
+
+    useEffect(() => {
+        if (searchParams.get('upgraded') === '1') {
+            toast({
+                title: 'Upgrade successful',
+                description: 'Your Pro features are now available.',
+            });
+        }
+    }, [searchParams]);
 
     const handleExport = () => {
         if (entries.length === 0) {
@@ -126,6 +143,35 @@ export default function Settings({ entryCount, userEmail }: SettingsProps) {
                     <AccountInfo email={userEmail} entryCount={displayCount} />
                 </div>
 
+                <div className="rounded-sm border border-border bg-card p-4 mb-8 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-medium">Current plan</p>
+                            <p className="text-label">Unlock advanced trends and report tools with Pro.</p>
+                        </div>
+                        <SubscriptionBadge planType={planType} status={status} />
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        {isPro ? (
+                            <ManageSubscriptionButton className="w-full sm:w-auto" />
+                        ) : (
+                            <Button
+                                type="button"
+                                className="w-full sm:w-auto"
+                                onClick={() => setIsUpgradeDialogOpen(true)}
+                            >
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Upgrade to Pro
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <ReportGenerator />
+                </div>
+
                 <div className="space-y-4">
                     <Button
                         variant="outline"
@@ -209,6 +255,13 @@ export default function Settings({ entryCount, userEmail }: SettingsProps) {
                         </AlertDialogContent>
                     </AlertDialog>
                 </div>
+
+                <UpgradeDialog
+                    open={isUpgradeDialogOpen}
+                    onOpenChange={setIsUpgradeDialogOpen}
+                    title="Upgrade to unlock Pro reports"
+                    description="Get 30-day and all-time trends, plus doctor-ready report generation."
+                />
             </div>
         </PageLayout>
     );

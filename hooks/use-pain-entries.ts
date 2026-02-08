@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { PainEntry, DbPainEntry, NewPainEntry, dbToClient, clientToDb } from '@/types/pain-entry';
 import { toast } from '@/hooks/use-toast';
 import { revalidatePainEntries } from '@/lib/actions/revalidate';
+import { trackClientEvent } from '@/lib/analytics/client';
 
 // Query key for React Query cache
 const PAIN_ENTRIES_KEY = ['pain-entries'] as const;
@@ -120,6 +121,12 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
       );
       // Invalidate server cache
       await revalidatePainEntries();
+
+      if ((context?.previous?.length ?? 0) === 0) {
+        void trackClientEvent('first_entry_logged', {
+          painLevel: variables.painLevel,
+        });
+      }
     },
   });
 

@@ -86,9 +86,17 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.next({ request });
     }
 
-    const isAuthRoute =
-        request.nextUrl.pathname.startsWith('/sign-in') ||
-        request.nextUrl.pathname.startsWith('/auth');
+    const pathname = request.nextUrl.pathname;
+    const isApiRoute = pathname.startsWith('/api/');
+    const isAuthRoute = pathname.startsWith('/sign-in') || pathname.startsWith('/auth');
+    const isPublicRoute =
+        isApiRoute ||
+        isAuthRoute ||
+        pathname.startsWith('/pricing') ||
+        pathname.startsWith('/share/') ||
+        pathname === '/share' ||
+        pathname.startsWith('/api/webhooks/razorpay') ||
+        pathname.startsWith('/api/reports/share/');
 
     let supabaseResponse = NextResponse.next({ request });
 
@@ -118,19 +126,19 @@ export async function updateSession(request: NextRequest) {
     if (!isValid) {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (!session && !isAuthRoute) {
+        if (!session && !isPublicRoute) {
             const url = request.nextUrl.clone();
             url.pathname = '/sign-in';
             return NextResponse.redirect(url);
         }
 
-        if (session && request.nextUrl.pathname === '/sign-in') {
+        if (session && pathname === '/sign-in') {
             const url = request.nextUrl.clone();
             url.pathname = '/';
             return NextResponse.redirect(url);
         }
     } else {
-        if (request.nextUrl.pathname === '/sign-in') {
+        if (pathname === '/sign-in') {
             const url = request.nextUrl.clone();
             url.pathname = '/';
             return NextResponse.redirect(url);
