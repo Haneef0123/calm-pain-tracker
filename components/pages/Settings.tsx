@@ -8,8 +8,9 @@ import { usePainEntries } from '@/hooks/use-pain-entries';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
-import { Download, Trash2, LogOut, UserX } from 'lucide-react';
+import { Download, Trash2, LogOut, UserX, BarChart3 } from 'lucide-react';
 import { AccountInfo } from '@/components/pain/AccountInfo';
+import Link from 'next/link';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,9 +27,10 @@ import type { PainEntry } from '@/types/pain-entry';
 interface SettingsProps {
     entryCount: number;
     userEmail: string | null;
+    showAdminAnalytics: boolean;
 }
 
-export default function Settings({ entryCount, userEmail }: SettingsProps) {
+export default function Settings({ entryCount, userEmail, showAdminAnalytics }: SettingsProps) {
     // Use hook without initial data - it will fetch on demand when needed
     const { entries, exportToCsv, clearAllEntries } = usePainEntries();
     // Use the SSR-provided count for display, or fall back to client-fetched length
@@ -127,6 +129,19 @@ export default function Settings({ entryCount, userEmail }: SettingsProps) {
                 </div>
 
                 <div className="space-y-4">
+                    {showAdminAnalytics && (
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="w-full justify-start h-12 bg-card border-border"
+                        >
+                            <Link href="/admin/analytics">
+                                <BarChart3 className="w-4 h-4 mr-3" />
+                                Admin analytics
+                            </Link>
+                        </Button>
+                    )}
+
                     <Button
                         variant="outline"
                         className="w-full justify-start h-12 bg-card border-border"
