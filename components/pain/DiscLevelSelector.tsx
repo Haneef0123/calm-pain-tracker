@@ -80,10 +80,14 @@ export function DiscLevelSelector({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-label">
-          Disc Level
-          {required && <span className="text-destructive ml-1">*</span>}
-        </span>
+        <div>
+          <span className="text-label">
+            Which disc?
+          </span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            Common disc auto-selected. Change if needed.
+          </span>
+        </div>
         <span className="text-xs text-muted-foreground">
           {value.length}/{maxDiscs} selected
         </span>

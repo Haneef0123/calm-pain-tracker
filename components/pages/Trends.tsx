@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
+import Link from 'next/link';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
@@ -20,7 +21,7 @@ import { Star } from 'lucide-react';
 // Content separated from JSX
 const PAGE_CONTENT = {
   title: 'Patterns',
-  emptyState: 'Once you log a few days, patterns will start to appear here.',
+  emptyState: 'Your first trend appears after 3 check-ins.',
   chartEmptyState: 'Patterns need time. A few more days will make this clearer.',
   chartTitle: 'Pain Level',
   chartHint: 'Lines connect recorded entries • Tap points for details',
@@ -284,8 +285,14 @@ export default function Trends({ initialEntries }: TrendsProps) {
         </div>
 
         {entries.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16 space-y-4">
             <p className="text-muted-foreground">{PAGE_CONTENT.emptyState}</p>
+            <Link
+              href="/"
+              className="inline-block text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 transition-colors"
+            >
+              Log now (10s) →
+            </Link>
           </div>
         ) : (
           <>

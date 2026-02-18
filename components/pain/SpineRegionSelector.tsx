@@ -11,12 +11,12 @@ interface SpineRegionSelectorProps {
 
 const SPINE_REGION_CONTENT = {
   cervical: {
-    label: 'Cervical',
-    description: 'Neck (C2-C7)',
+    label: 'Neck',
+    description: 'Upper spine',
   },
   lumbar: {
-    label: 'Lumbar',
-    description: 'Lower back (L1-S1)',
+    label: 'Lower back',
+    description: 'Lower spine',
   },
 } as const;
 
@@ -29,7 +29,7 @@ export function SpineRegionSelector({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <span className="text-label">
-          Spine Region
+          Where is your pain?
           {required && <span className="text-destructive ml-1">*</span>}
         </span>
       </div>
