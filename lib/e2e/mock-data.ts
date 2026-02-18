@@ -9,6 +9,17 @@ export function isE2ETestMode(): boolean {
   if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true') {
     return true;
   }
+
+  // Local test-auth mode for manual development/testing.
+  if (process.env.ENABLE_TEST_AUTH === 'true') {
+    return true;
+  }
+
+  // Client-side fallback for test mode propagated by middleware cookie.
+  if (typeof document !== 'undefined') {
+    return document.cookie.includes('painmap_test_auth=1');
+  }
+
   return false;
 }
 

@@ -46,11 +46,16 @@ const emptyRegionData: RegionFormData = {
   neuroSigns: [],
 };
 
+const SMART_DEFAULTS: Record<SpineRegion, string> = {
+  cervical: 'C5-C6',
+  lumbar: 'L4-L5',
+};
+
 const initialFormState: PainEntryFormState = {
   spineRegion: null,
   cervical: { ...emptyRegionData },
   lumbar: { ...emptyRegionData },
-  painLevel: 0,
+  painLevel: 5,
   notes: '',
 };
 
@@ -60,8 +65,19 @@ const initialFormState: PainEntryFormState = {
 
 function formReducer(state: PainEntryFormState, action: FormAction): PainEntryFormState {
   switch (action.type) {
-    case 'SET_REGION':
-      return { ...state, spineRegion: action.region };
+    case 'SET_REGION': {
+      const newState = { ...state, spineRegion: action.region };
+      // Smart default: auto-set primary disc if none selected for this region
+      const regionData = newState[action.region];
+      if (regionData.discs.length === 0) {
+        const defaultLevel = SMART_DEFAULTS[action.region];
+        newState[action.region] = {
+          ...regionData,
+          discs: [{ level: defaultLevel, role: 'primary' }],
+        };
+      }
+      return newState;
+    }
 
     case 'SET_DISCS': {
       if (!state.spineRegion) return state;

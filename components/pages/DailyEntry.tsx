@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
+import { SlidersHorizontal } from 'lucide-react';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PainSlider } from '@/components/pain/PainSlider';
 import { SpineRegionSelector } from '@/components/pain/SpineRegionSelector';
@@ -14,6 +16,15 @@ import { RotatingTips } from '@/components/home/RotatingTips';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from '@/components/ui/drawer';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { usePainEntryForm } from '@/hooks/use-pain-entry-form';
 import { toast } from '@/hooks/use-toast';
@@ -26,8 +37,13 @@ const FORM_CONTENT = {
     formatFull: 'MMMM d, yyyy',
   },
   painLevel: {
-    label: 'Primary disc pain level',
-    required: true,
+    label: 'How much pain?',
+  },
+  details: {
+    trigger: 'Add details',
+    title: 'Details',
+    description: 'Disc, symptoms, and notes',
+    done: 'Done',
   },
   notes: {
     label: 'Anything worth noting?',
@@ -39,11 +55,31 @@ const FORM_CONTENT = {
   },
 } as const;
 
+/** Count how many optional detail fields the user has customized */
+function getDetailCount(form: {
+  sensations: string[];
+  radiation: string[];
+  aggravators: string[];
+  neuroSigns: string[];
+  notes: string;
+}): number {
+  let count = 0;
+  if (form.sensations.length > 0) count++;
+  if (form.radiation.length > 0) count++;
+  if (form.aggravators.length > 0) count++;
+  if (form.neuroSigns.length > 0) count++;
+  if (form.notes.trim().length > 0) count++;
+  return count;
+}
+
 export default function DailyEntry() {
-  const { addEntry } = usePainEntries();
+  const { entries, addEntry } = usePainEntries();
   const form = usePainEntryForm();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const today = new Date();
+  const entryCount = entries?.length ?? 0;
+  const detailCount = getDetailCount(form);
 
   const handleSave = async () => {
     const entryData = form.getEntryData();
@@ -52,6 +88,7 @@ export default function DailyEntry() {
     try {
       await addEntry(entryData);
       form.reset();
+      setDrawerOpen(false);
 
       toast({
         title: FORM_CONTENT.submit.successMessage,
@@ -77,63 +114,89 @@ export default function DailyEntry() {
           </h1>
         </header>
 
+
         <div className="divider" />
 
-        {/* Step 1: Spine Region */}
+        {/* Pain Level — always visible, default 5 */}
+        <div className="text-center space-y-2">
+          <p className="text-label">
+            {FORM_CONTENT.painLevel.label}
+          </p>
+          <p className={cn('text-display', getPainLevelClass(form.painLevel))}>
+            {form.painLevel}
+          </p>
+        </div>
+
+        <PainSlider value={form.painLevel} onChange={form.setPainLevel} />
+
+        <div className="divider" />
+
+        {/* Area selector — always visible, plain language */}
         <SpineRegionSelector
           value={form.spineRegion}
           onChange={form.setSpineRegion}
-          required
         />
 
-        {/* Initial State: Show tips and last entry when no region selected */}
-        {!form.spineRegion && (
-          <div className="space-y-6 animate-fade-in">
-            <LastEntryCard />
-            <RotatingTips />
-          </div>
+        {/* Two buttons side by side: Log today (primary) + Add details (secondary) */}
+        <div className="flex gap-3">
+          <Button
+            onClick={handleSave}
+            disabled={!form.isValid}
+            className="flex-1 h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {FORM_CONTENT.submit.label}
+          </Button>
+
+          <Button
+            variant="outline"
+            disabled={!form.spineRegion}
+            onClick={() => setDrawerOpen(true)}
+            className="flex-1 h-12 border-border hover:bg-card transition-colors duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <SlidersHorizontal className="w-4 h-4 mr-2" />
+            {FORM_CONTENT.details.trigger}
+            {detailCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-foreground text-background text-xs font-medium">
+                {detailCount}
+              </span>
+            )}
+          </Button>
+        </div>
+
+        {/* Validation error hint */}
+        {!form.isValid && form.spineRegion && form.validationError && (
+          <p className="text-xs text-destructive text-center">
+            {form.validationError}
+          </p>
         )}
 
-        {/* Step 2: Disc Level (only show after region selected) */}
-        {form.spineRegion && (
-          <>
-            <div className="divider" />
-            <DiscLevelSelector
-              spineRegion={form.spineRegion}
-              value={form.discs}
-              onChange={form.setDiscs}
-              required
-            />
-          </>
-        )}
+        <div className="divider" />
 
-        {/* Step 3: Pain Level (only show after disc selected) */}
-        {form.discs.length > 0 && (
-          <>
-            <div className="divider" />
+        {/* Context cards — always visible below */}
+        <div className="space-y-6 animate-fade-in">
+          <LastEntryCard />
+          <RotatingTips />
+        </div>
+      </div>
 
-            <div className="text-center space-y-2">
-              <p className="text-label">
-                {FORM_CONTENT.painLevel.label}
-                {form.primaryDisc && (
-                  <span className="text-muted-foreground ml-1">
-                    ({form.primaryDisc.level})
-                  </span>
-                )}
-                <span className="text-destructive ml-1">*</span>
-              </p>
-              <p className={cn('text-display', getPainLevelClass(form.painLevel))}>
-                {form.painLevel}
-              </p>
-            </div>
+      {/* Details Drawer (bottom sheet) */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader>
+            <DrawerTitle>{FORM_CONTENT.details.title}</DrawerTitle>
+            <DrawerDescription>{FORM_CONTENT.details.description}</DrawerDescription>
+          </DrawerHeader>
 
-            <PainSlider value={form.painLevel} onChange={form.setPainLevel} />
-          </>
-        )}
+          <div className="overflow-y-auto px-4 pb-4 space-y-8">
+            {/* Disc Level (smart default pre-selected) */}
+            {form.spineRegion && (
+              <DiscLevelSelector
+                spineRegion={form.spineRegion}
+                value={form.discs}
+                onChange={form.setDiscs}
+              />
+            )}
 
-        {/* Step 4+: Additional fields (only show after pain level set) */}
-        {form.painLevel > 0 && form.spineRegion && (
-          <>
             <div className="divider" />
 
             {/* Sensations */}
@@ -142,29 +205,35 @@ export default function DailyEntry() {
             <div className="divider" />
 
             {/* Radiation Path */}
-            <RadiationSelector
-              spineRegion={form.spineRegion}
-              value={form.radiation}
-              onChange={form.setRadiation}
-            />
+            {form.spineRegion && (
+              <RadiationSelector
+                spineRegion={form.spineRegion}
+                value={form.radiation}
+                onChange={form.setRadiation}
+              />
+            )}
 
             <div className="divider" />
 
             {/* Aggravating Positions */}
-            <AggravatorSelector
-              spineRegion={form.spineRegion}
-              value={form.aggravators}
-              onChange={form.setAggravators}
-            />
+            {form.spineRegion && (
+              <AggravatorSelector
+                spineRegion={form.spineRegion}
+                value={form.aggravators}
+                onChange={form.setAggravators}
+              />
+            )}
 
             <div className="divider" />
 
-            {/* Neurological Signs (optional) */}
-            <NeurologicalSignsSelector
-              spineRegion={form.spineRegion}
-              value={form.neuroSigns}
-              onChange={form.setNeuroSigns}
-            />
+            {/* Neurological Signs */}
+            {form.spineRegion && (
+              <NeurologicalSignsSelector
+                spineRegion={form.spineRegion}
+                value={form.neuroSigns}
+                onChange={form.setNeuroSigns}
+              />
+            )}
 
             <div className="divider" />
 
@@ -181,25 +250,17 @@ export default function DailyEntry() {
                 className="min-h-24 bg-card border-border resize-none"
               />
             </div>
+          </div>
 
-            {/* Save button */}
-            <Button
-              onClick={handleSave}
-              disabled={!form.isValid}
-              className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {FORM_CONTENT.submit.label}
-            </Button>
-
-            {/* Validation error hint */}
-            {!form.isValid && form.validationError && (
-              <p className="text-xs text-destructive text-center">
-                {form.validationError}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button className="w-full h-12 bg-foreground text-background hover:bg-foreground/90">
+                {FORM_CONTENT.details.done}
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </PageLayout>
   );
 }

@@ -30,7 +30,7 @@ export default function SignInPage() {
                         PainMap
                     </h1>
                     <p className="text-muted-foreground">
-                        Track your pain, understand your patterns
+                        Your first pain trend appears after 3 check-ins — takes 30 seconds to start
                     </p>
                 </div>
 

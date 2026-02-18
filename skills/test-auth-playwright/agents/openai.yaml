@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Auth Playwright"
+  short_description: "Test app flows without signup wall"
+  default_prompt: "Run app testing with ENABLE_TEST_AUTH enabled, bypass signup/sign-in redirects, and report route behavior."

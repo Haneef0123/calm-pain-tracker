@@ -1,0 +1,4 @@
+interface:
+  display_name: "Platform Log Analysis"
+  short_description: "Analyze Vercel and Supabase logs together"
+  default_prompt: "Fetch Vercel and Supabase logs together, analyze the latest API and auth/database activity, and summarize findings."

@@ -78,6 +78,20 @@ function getSessionFromCookies(request: NextRequest): { isValid: boolean; userId
 }
 
 export async function updateSession(request: NextRequest) {
+    // Local test-auth mode: bypass auth when explicitly enabled for development.
+    // This allows testing app flows without going through OAuth signup/sign-in.
+    const isTestAuthMode =
+        process.env.ENABLE_TEST_AUTH === 'true' &&
+        process.env.NODE_ENV !== 'production';
+    if (isTestAuthMode) {
+        const response = NextResponse.next({ request });
+        response.cookies.set('painmap_test_auth', '1', {
+            path: '/',
+            sameSite: 'lax',
+        });
+        return response;
+    }
+
     // E2E Test Mode: Bypass auth for Playwright testing
     // Set NEXT_PUBLIC_E2E_TEST_MODE=true in .env.local to enable
     if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true') {
