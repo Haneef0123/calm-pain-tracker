@@ -21,9 +21,12 @@ export function RouteChangeIndicator() {
                 style={{
                     width: `${progress}%`,
                     opacity: isNavigating ? 1 : 0,
+                    // While navigating: animate width only (opacity is locked to 1).
+                    // While fading out: animate opacity only; progress is still 100% so
+                    // width stays put — no visible shrink — until the bar is invisible.
                     transition: isNavigating
                         ? 'width 150ms ease-out'
-                        : 'opacity 300ms ease-out',
+                        : 'width 0ms, opacity 300ms ease-out',
                 }}
             />
         </div>

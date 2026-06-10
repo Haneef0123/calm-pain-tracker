@@ -22,6 +22,7 @@ export function NavigationProgressProvider({ children }: { children: React.React
     const isNavigatingRef = useRef(false);
     const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevPathnameRef = useRef(pathname);
 
@@ -34,6 +35,10 @@ export function NavigationProgressProvider({ children }: { children: React.React
             clearTimeout(completeTimerRef.current);
             completeTimerRef.current = null;
         }
+        if (resetTimerRef.current) {
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = null;
+        }
         if (safetyTimerRef.current) {
             clearTimeout(safetyTimerRef.current);
             safetyTimerRef.current = null;
@@ -41,7 +46,6 @@ export function NavigationProgressProvider({ children }: { children: React.React
     }, []);
 
     const startNavigation = useCallback(() => {
-        // Guard against double-trigger
         if (isNavigatingRef.current) return;
 
         isNavigatingRef.current = true;
@@ -51,7 +55,6 @@ export function NavigationProgressProvider({ children }: { children: React.React
         progressIntervalRef.current = setInterval(() => {
             setProgress(prev => {
                 if (prev >= 85) return prev;
-                // Diminishing increments as we approach 85%
                 const increment = Math.random() * 12 * (1 - prev / 100);
                 return Math.min(prev + increment, 85);
             });
@@ -72,14 +75,21 @@ export function NavigationProgressProvider({ children }: { children: React.React
             prevPathnameRef.current = pathname;
 
             if (isNavigatingRef.current) {
+                // Unblock new navigations immediately — don't wait for fade-out
+                isNavigatingRef.current = false;
                 clearAllTimers();
-                setProgress(100);
 
+                // Snap bar to 100%, then begin fade-out after a brief hold
+                setProgress(100);
                 completeTimerRef.current = setTimeout(() => {
-                    isNavigatingRef.current = false;
                     setIsNavigating(false);
+                    // progress stays at 100% so the bar doesn't visually shrink during fade
+                }, 100);
+
+                // Reset progress only after fade-out animation finishes (100ms + 300ms fade)
+                resetTimerRef.current = setTimeout(() => {
                     setProgress(0);
-                }, 400);
+                }, 450);
             }
         }
     }, [pathname, clearAllTimers]);
