@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calendar, History, TrendingUp, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNavigationProgress } from '@/hooks/use-navigation-progress';
 
 const navItems = [
   { path: '/', icon: Calendar, label: 'Today' },
@@ -14,6 +15,7 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { startNavigation } = useNavigationProgress();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border pb-safe-bottom">
@@ -24,6 +26,9 @@ export function BottomNav() {
             <Link
               key={path}
               href={path}
+              onClick={() => {
+                if (path !== pathname) startNavigation();
+              }}
               className={cn(
                 'flex flex-col items-center justify-center flex-1 h-full transition-opacity duration-100',
                 isActive ? 'opacity-100' : 'opacity-50 hover:opacity-75'
