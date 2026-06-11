@@ -26,7 +26,21 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to build admin analytics snapshot', error);
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (message.includes('Missing SUPABASE_SERVICE_ROLE_KEY') || message.includes('Missing NEXT_PUBLIC_SUPABASE_URL')) {
+      console.error('[analytics] Configuration error — check that SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are set in your deployment environment:', message);
+    } else if (
+      message.toLowerCase().includes('invalid api key') ||
+      message.toLowerCase().includes('invalid token') ||
+      message.toLowerCase().includes('jwt') ||
+      message.toLowerCase().includes('unauthorized')
+    ) {
+      console.error('[analytics] Supabase auth error — SUPABASE_SERVICE_ROLE_KEY may be wrong or rotated. Re-copy it from Supabase → Settings → API:', message);
+    } else {
+      console.error('[analytics] Failed to build snapshot:', message, error);
+    }
+
     return NextResponse.json(
       { error: 'Unable to load analytics right now' },
       { status: 500 }

@@ -105,7 +105,9 @@ async function listAllUsers() {
 
   for (let page = 1; page <= maxPages; page += 1) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw error;
+    if (error) {
+      throw new Error(`auth.admin.listUsers failed (page ${page}): ${error.message}`);
+    }
 
     const batch = data?.users ?? [];
     for (const user of batch) {
@@ -139,7 +141,9 @@ async function listRecentEntryEvents(cutoffIso: string) {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`pain_entries query failed (page ${page}): ${error.message}`);
+    }
 
     const batch = (data ?? []) as EntryEvent[];
     events.push(...batch);
