@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { SlidersHorizontal } from 'lucide-react';
+import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PainSlider } from '@/components/pain/PainSlider';
 import { SpineRegionSelector } from '@/components/pain/SpineRegionSelector';
@@ -73,7 +73,7 @@ function getDetailCount(form: {
 }
 
 export default function DailyEntry() {
-  const { entries, addEntry } = usePainEntries();
+  const { entries, addEntry, isAddingEntry } = usePainEntries();
   const form = usePainEntryForm();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -141,10 +141,17 @@ export default function DailyEntry() {
         <div className="flex gap-3">
           <Button
             onClick={handleSave}
-            disabled={!form.isValid}
+            disabled={!form.isValid || isAddingEntry}
             className="flex-1 h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {FORM_CONTENT.submit.label}
+            {isAddingEntry ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              FORM_CONTENT.submit.label
+            )}
           </Button>
 
           <Button

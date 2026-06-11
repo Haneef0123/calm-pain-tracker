@@ -371,6 +371,7 @@ export function usePainEntries(initialEntries: PainEntry[] = []) {
     entries,
     isLoaded,
     isFetching, // Expose for debugging/UI if needed
+    isAddingEntry: addMutation.isPending,
     addEntry: (entry: NewPainEntry) => addMutation.mutateAsync(entry),
     updateEntry: (id: string, updates: Partial<NewPainEntry>) =>
       updateMutation.mutateAsync({ id, updates }),
