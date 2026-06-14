@@ -4,6 +4,7 @@ import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'reac
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
+import { useActionOverlay } from '@/components/ui/action-overlay';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
@@ -25,6 +26,11 @@ interface SettingsRowProps {
 }
 
 const RowDivider = () => <div className="mx-[18px] h-px bg-[#f0f2f0]" />;
+
+const SETTINGS_OVERLAY_ACCENTS = {
+    export: '#008391',
+    clear: '#d53627',
+} as const;
 
 function SettingsRow({ icon, label, onClick, disabled = false, danger = false }: SettingsRowProps) {
     return (
@@ -92,6 +98,7 @@ function clearConfirmation(
 
 export default function Settings({ entryCount, userEmail, showAdminAnalytics }: SettingsProps) {
     const { entries, exportToCsv, clearAllEntries, isLoaded } = usePainEntries();
+    const { showOverlay } = useActionOverlay();
     const displayCount = isLoaded ? entries.length : entryCount;
     const { signOut } = useAuth();
     const router = useRouter();
@@ -127,10 +134,12 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
             return;
         }
 
+        const exportedCount = entries.length;
         exportToCsv();
-        toast({
-            title: 'Export complete',
-            description: `Exported ${entries.length} entries.`,
+        showOverlay({
+            title: 'Exported.',
+            subtitle: `${exportedCount} ${exportedCount === 1 ? 'entry' : 'entries'} in CSV`,
+            accent: SETTINGS_OVERLAY_ACCENTS.export,
         });
     };
 
@@ -189,9 +198,10 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
 
         try {
             await clearAllEntries();
-            toast({
-                title: 'Data cleared',
-                description: 'All entries have been deleted.',
+            showOverlay({
+                title: 'Cleared.',
+                subtitle: 'All entries removed',
+                accent: SETTINGS_OVERLAY_ACCENTS.clear,
             });
         } catch {
             // Error already shown by hook.

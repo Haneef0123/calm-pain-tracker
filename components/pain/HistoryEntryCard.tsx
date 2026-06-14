@@ -21,7 +21,7 @@ interface HistoryEntryCardProps {
   entry: PainEntry;
   isExpanded: boolean;
   onToggle: () => void;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
 }
 
 export function HistoryEntryCard({
@@ -132,7 +132,9 @@ export function HistoryEntryCard({
 
           <button
             type="button"
-            onClick={onDelete}
+            onClick={() => {
+              void onDelete();
+            }}
             className="-ml-[10px] inline-flex items-center gap-[6px] self-start rounded-full bg-transparent px-[10px] py-[6px] text-[13px] font-semibold text-[#d53627] transition-colors hover:bg-[#fcebe9]"
           >
             <svg

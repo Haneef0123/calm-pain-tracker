@@ -51,9 +51,13 @@ export default function History({ initialEntries }: HistoryProps) {
                             entry={entry}
                             isExpanded={expandedId === entry.id}
                             onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                            onDelete={() => {
+                            onDelete={async () => {
                                 setExpandedId((currentId) => (currentId === entry.id ? null : currentId));
-                                deleteEntry(entry.id);
+                                try {
+                                    await deleteEntry(entry.id);
+                                } catch {
+                                    // Error toast is already handled in the mutation hook.
+                                }
                             }}
                         />
                     ))}

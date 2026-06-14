@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -25,6 +25,7 @@ import {
   DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
+import { useActionOverlay } from '@/components/ui/action-overlay';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { usePainEntryForm } from '@/hooks/use-pain-entry-form';
 import { toast } from '@/hooks/use-toast';
@@ -52,16 +53,9 @@ const FORM_CONTENT = {
   submit: {
     label: 'Log today',
     successMessage: 'Noted.',
+    successSubtitle: 'Logged for today',
   },
 } as const;
-
-const SAVE_OVERLAY_DURATION_MS = 1800;
-const SAVE_OVERLAY_STORAGE_KEY = 'painmap-log-today-overlay';
-
-interface SaveOverlayPayload {
-  accent: string;
-  expiresAt: number;
-}
 
 /** Count how many optional detail fields the user has customized */
 function getDetailCount(form: {
@@ -82,77 +76,17 @@ function getDetailCount(form: {
 
 export default function DailyEntry() {
   const { addEntry, isAddingEntry } = usePainEntries();
+  const {
+    showOverlay,
+    clearOverlay,
+    isVisible: isActionOverlayVisible,
+  } = useActionOverlay();
   const form = usePainEntryForm();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [saveOverlayAccent, setSaveOverlayAccent] = useState<string | null>(null);
-  const saveOverlayTimerRef = useRef<number | null>(null);
 
   const today = new Date();
   const detailCount = getDetailCount(form);
   const painVisuals = getPainLevelVisuals(form.painLevel);
-
-  const clearSaveOverlay = () => {
-    if (saveOverlayTimerRef.current) {
-      window.clearTimeout(saveOverlayTimerRef.current);
-      saveOverlayTimerRef.current = null;
-    }
-
-    window.sessionStorage.removeItem(SAVE_OVERLAY_STORAGE_KEY);
-    setSaveOverlayAccent(null);
-  };
-
-  const scheduleSaveOverlayClear = (expiresAt: number) => {
-    if (saveOverlayTimerRef.current) {
-      window.clearTimeout(saveOverlayTimerRef.current);
-    }
-
-    const remainingMs = Math.max(0, expiresAt - Date.now());
-    if (remainingMs === 0) {
-      clearSaveOverlay();
-      return;
-    }
-
-    saveOverlayTimerRef.current = window.setTimeout(() => {
-      clearSaveOverlay();
-    }, remainingMs);
-  };
-
-  const syncSaveOverlayFromStorage = () => {
-    const rawPayload = window.sessionStorage.getItem(SAVE_OVERLAY_STORAGE_KEY);
-    if (!rawPayload) {
-      setSaveOverlayAccent(null);
-      return;
-    }
-
-    try {
-      const payload = JSON.parse(rawPayload) as SaveOverlayPayload;
-      if (!payload.accent || payload.expiresAt <= Date.now()) {
-        clearSaveOverlay();
-        return;
-      }
-
-      setSaveOverlayAccent(payload.accent);
-      scheduleSaveOverlayClear(payload.expiresAt);
-    } catch {
-      clearSaveOverlay();
-    }
-  };
-
-  useEffect(() => {
-    const handleSaveOverlaySync = () => {
-      syncSaveOverlayFromStorage();
-    };
-
-    syncSaveOverlayFromStorage();
-    window.addEventListener('painmap:save-overlay', handleSaveOverlaySync);
-
-    return () => {
-      if (saveOverlayTimerRef.current) {
-        window.clearTimeout(saveOverlayTimerRef.current);
-      }
-      window.removeEventListener('painmap:save-overlay', handleSaveOverlaySync);
-    };
-  }, []);
 
   const handleSave = async () => {
     const entryData = form.getEntryData();
@@ -163,18 +97,13 @@ export default function DailyEntry() {
       await addEntry(entryData);
       form.reset();
       setDrawerOpen(false);
-
-      const overlayPayload: SaveOverlayPayload = {
+      showOverlay({
         accent: savedAccent,
-        expiresAt: Date.now() + SAVE_OVERLAY_DURATION_MS,
-      };
-      window.sessionStorage.setItem(
-        SAVE_OVERLAY_STORAGE_KEY,
-        JSON.stringify(overlayPayload),
-      );
-      window.dispatchEvent(new Event('painmap:save-overlay'));
+        title: FORM_CONTENT.submit.successMessage,
+        subtitle: FORM_CONTENT.submit.successSubtitle,
+      });
     } catch {
-      clearSaveOverlay();
+      clearOverlay();
       toast({
         title: 'Failed to save entry',
         variant: 'destructive',
@@ -232,7 +161,7 @@ export default function DailyEntry() {
         <div className="flex gap-[10px]">
           <Button
             onClick={handleSave}
-            disabled={!form.isValid || isAddingEntry || saveOverlayAccent !== null}
+            disabled={!form.isValid || isAddingEntry || isActionOverlayVisible}
             className="h-[52px] flex-[1.3] rounded-full bg-[#181b19] text-[15px] font-semibold text-white hover:bg-[#2c302d] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isAddingEntry ? (
@@ -274,41 +203,6 @@ export default function DailyEntry() {
           <RotatingTips />
         </div>
       </div>
-
-      {saveOverlayAccent && (
-        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-[430px] -translate-x-1/2 items-center justify-center bg-[rgba(255,255,255,0.93)] backdrop-blur-[4px]">
-          <div
-            aria-live="polite"
-            role="status"
-            className="animate-fade-up flex flex-col items-center gap-[6px] px-6 text-center"
-          >
-            <div
-              className="mb-[10px] flex h-[72px] w-[72px] animate-scale-in items-center justify-center rounded-full"
-              style={{ backgroundColor: saveOverlayAccent }}
-            >
-              <svg
-                width="34"
-                height="34"
-                viewBox="0 0 34 34"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M8 18l6 6 12-13"
-                  stroke="#ffffff"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <span className="text-[19px] font-semibold text-[#1c211d]">
-              {FORM_CONTENT.submit.successMessage}
-            </span>
-            <span className="text-[13px] text-[#777777]">Logged for today</span>
-          </div>
-        </div>
-      )}
 
       {/* Details Drawer (bottom sheet) */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

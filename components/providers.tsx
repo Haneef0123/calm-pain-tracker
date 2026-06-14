@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ActionOverlayProvider } from '@/components/ui/action-overlay';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -34,9 +35,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
                 <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    {children}
+                    <ActionOverlayProvider>
+                        <Toaster />
+                        <Sonner />
+                        {children}
+                    </ActionOverlayProvider>
                 </TooltipProvider>
             </AuthProvider>
         </QueryClientProvider>
