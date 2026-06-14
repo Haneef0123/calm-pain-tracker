@@ -28,7 +28,6 @@ interface SettingsRowProps {
 const RowDivider = () => <div className="mx-[18px] h-px bg-[#f0f2f0]" />;
 
 const SETTINGS_OVERLAY_ACCENTS = {
-    export: '#008391',
     clear: '#d53627',
 } as const;
 
@@ -134,13 +133,7 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
             return;
         }
 
-        const exportedCount = entries.length;
         exportToCsv();
-        showOverlay({
-            title: 'Exported.',
-            subtitle: `${exportedCount} ${exportedCount === 1 ? 'entry' : 'entries'} in CSV`,
-            accent: SETTINGS_OVERLAY_ACCENTS.export,
-        });
     };
 
     const handleSignOut = async () => {
