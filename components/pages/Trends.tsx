@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { format, subDays, isAfter, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import Link from 'next/link';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { usePainEntries } from '@/hooks/use-pain-entries';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { StatsCard } from '@/components/pain/StatsCard';
 import { TimeRangeSelector, type TimeRange } from '@/components/pain/TimeRangeSelector';
 import type { PainEntry } from '@/types/pain-entry';
@@ -14,26 +14,17 @@ import {
   getPrimaryDisc,
   getSecondaryDiscs,
   getSensationLabel,
-  getRadiationLabel,
 } from '@/types/pain-entry';
-import { Star } from 'lucide-react';
+import { getPainColor, getPainLevelVisuals } from '@/lib/utils';
 
-// Content separated from JSX
 const PAGE_CONTENT = {
   title: 'Patterns',
   emptyState: 'Your first trend appears after 3 check-ins.',
   chartEmptyState: 'Patterns need time. A few more days will make this clearer.',
-  chartTitle: 'Pain Level',
-  chartHint: 'Lines connect recorded entries • Tap points for details',
-  stats: {
-    average: 'Average',
-    worst: 'Worst',
-    best: 'Best',
-  },
   ranges: {
-    '7d': 'last 7 days',
-    '30d': 'last 30 days',
-    'all': 'all time',
+    '7d': 'Last 7 days',
+    '30d': 'Last 30 days',
+    'all': 'All time',
   },
 } as const;
 
@@ -46,10 +37,8 @@ interface ChartDataPoint {
   fullDate: string;
   pain: number;
   timestamp: string;
-  // Legacy format
   locations: string[];
   types: string[];
-  // New disc-focused format
   spineRegion?: string | null;
   primaryDisc?: string;
   secondaryDiscs?: string[];
@@ -61,6 +50,11 @@ interface ChartDataPoint {
 export default function Trends({ initialEntries }: TrendsProps) {
   const { entries, isLoaded } = usePainEntries(initialEntries);
   const [range, setRange] = useState<TimeRange>('7d');
+  const [selectedPoint, setSelectedPoint] = useState<ChartDataPoint | null>(null);
+
+  const handleRangeChange = (newRange: TimeRange) => {
+    setRange(newRange);
+  };
 
   const filteredEntries = useMemo(() => {
     if (range === 'all') return entries;
@@ -76,7 +70,6 @@ export default function Trends({ initialEntries }: TrendsProps) {
   const chartData = useMemo(() => {
     const reversed = [...filteredEntries].reverse();
 
-    // Check if we have multiple entries on the same day
     const dateMap = new Map<string, number>();
     reversed.forEach(entry => {
       const dateKey = format(parseISO(entry.timestamp), 'yyyy-MM-dd');
@@ -89,7 +82,6 @@ export default function Trends({ initialEntries }: TrendsProps) {
       let dateLabel: string;
 
       if (hasMultipleEntriesPerDay) {
-        // Show time when multiple entries per day
         if (isToday(date)) {
           dateLabel = format(date, 'h:mm a');
         } else if (isYesterday(date)) {
@@ -98,7 +90,6 @@ export default function Trends({ initialEntries }: TrendsProps) {
           dateLabel = format(date, 'MMM d, h:mm a');
         }
       } else {
-        // Show relative dates when one entry per day
         if (isToday(date)) {
           dateLabel = 'Today';
         } else if (isYesterday(date)) {
@@ -113,20 +104,17 @@ export default function Trends({ initialEntries }: TrendsProps) {
         }
       }
 
-      // Extract disc-focused data if available
       const isDisc = isDiscEntry(entry);
       const primaryDisc = isDisc ? getPrimaryDisc(entry) : null;
       const secondaryDiscs = isDisc ? getSecondaryDiscs(entry) : [];
 
       return {
         date: dateLabel,
-        fullDate: format(date, 'MMM d, yyyy h:mm a'),
+        fullDate: format(date, 'MMM d, yyyy · h:mm a'),
         pain: entry.painLevel,
         timestamp: entry.timestamp,
-        // Legacy data
         locations: entry.locations,
         types: entry.types,
-        // Disc-focused data
         spineRegion: isDisc ? entry.spineRegion : null,
         primaryDisc: primaryDisc?.level,
         secondaryDiscs: secondaryDiscs.map(d => d.level),
@@ -136,6 +124,21 @@ export default function Trends({ initialEntries }: TrendsProps) {
       };
     });
   }, [filteredEntries]);
+
+  useEffect(() => {
+    if (chartData.length === 0) {
+      setSelectedPoint(null);
+      return;
+    }
+
+    setSelectedPoint((current) => {
+      if (current && chartData.some((point) => point.timestamp === current.timestamp)) {
+        return current;
+      }
+
+      return chartData[chartData.length - 1];
+    });
+  }, [chartData]);
 
   const stats = useMemo(() => {
     if (filteredEntries.length === 0) {
@@ -152,120 +155,21 @@ export default function Trends({ initialEntries }: TrendsProps) {
 
   const rangeLabel = PAGE_CONTENT.ranges[range];
 
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: ChartDataPoint }[] }) => {
-    if (!active || !payload || !payload.length) return null;
-
-    const data = payload[0].payload;
-    const painLevel = data.pain;
-    const painColorClass = painLevel <= 6 ? 'text-foreground' : 'text-destructive';
-    const hasDiscData = data.spineRegion !== null && data.spineRegion !== undefined;
-
-    return (
-      <div className="bg-card border border-border rounded-sm p-3 shadow-lg max-w-[280px]">
-        <p className="text-xs text-muted-foreground mb-2">{data.fullDate}</p>
-        <p className={`text-2xl font-semibold tabular-nums mb-2 ${painColorClass}`}>
-          {painLevel}
-        </p>
-
-        {hasDiscData ? (
-          // Disc-focused tooltip
-          <>
-            {/* Spine region */}
-            <p className="text-xs text-muted-foreground mb-1 capitalize">
-              <span className="font-medium">{data.spineRegion}</span> spine
-            </p>
-
-            {/* Primary disc */}
-            {data.primaryDisc && (
-              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                <Star className="w-3 h-3 text-yellow-500" fill="currentColor" />
-                <span className="font-medium">Primary:</span> {data.primaryDisc}
-              </p>
-            )}
-
-            {/* Secondary discs */}
-            {data.secondaryDiscs && data.secondaryDiscs.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-medium">Secondary:</span> {data.secondaryDiscs.join(', ')}
-              </p>
-            )}
-
-            {/* Sensations */}
-            {data.sensations && data.sensations.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-medium">Sensations:</span>{' '}
-                {data.sensations.map(getSensationLabel).join(', ')}
-              </p>
-            )}
-
-            {/* Radiation */}
-            {data.radiation && data.radiation.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-medium">Radiation:</span>{' '}
-                {data.radiation.map(getRadiationLabel).join(' → ')}
-              </p>
-            )}
-          </>
-        ) : (
-          // Legacy tooltip
-          <>
-            {data.locations.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-medium">Locations:</span> {data.locations.join(', ')}
-              </p>
-            )}
-            {data.types.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-1">
-                <span className="font-medium">Types:</span> {data.types.join(', ')}
-              </p>
-            )}
-          </>
-        )}
-
-        {data.notes && (
-          <p className="text-xs text-muted-foreground mt-2 italic">
-            &ldquo;{data.notes.slice(0, 60)}{data.notes.length > 60 ? '...' : ''}&rdquo;
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  // Custom dot component with color coding
-  const CustomDot = (props: { cx?: number; cy?: number; payload?: { pain: number } }) => {
-    const { cx, cy, payload } = props;
-    if (cx === undefined || cy === undefined || !payload) return null;
-
-    const painLevel = payload.pain;
-    const color = painLevel <= 6 ? 'hsl(var(--foreground))' : 'hsl(var(--destructive))';
-
-    return (
-      <>
-        {/* Larger invisible hit area for mobile */}
-        <circle cx={cx} cy={cy} r={12} fill="transparent" style={{ cursor: 'pointer' }} />
-        {/* Visible dot */}
-        <circle cx={cx} cy={cy} r={4} fill={color} stroke="hsl(var(--background))" strokeWidth={1.5} />
-      </>
-    );
-  };
-
-  // Loading skeleton
   if (!isLoaded) {
     return (
       <PageLayout>
-        <div className="pt-8 animate-fade-in">
-          <header className="mb-8">
-            <h1 className="text-heading">{PAGE_CONTENT.title}</h1>
-          </header>
-          <div className="animate-pulse">
-            <div className="h-10 bg-muted rounded-sm mb-8 w-80" />
-            <div className="grid grid-cols-3 gap-4 mb-10">
-              <div className="h-20 bg-muted rounded-sm" />
-              <div className="h-20 bg-muted rounded-sm" />
-              <div className="h-20 bg-muted rounded-sm" />
+        <div className="pt-7 pb-6 flex flex-col gap-[14px]">
+          <h1 className="text-[24px] leading-[30px] font-semibold tracking-[-0.02em] text-[#1c211d]">
+            {PAGE_CONTENT.title}
+          </h1>
+          <div className="animate-pulse flex flex-col gap-[14px]">
+            <div className="h-10 rounded-[18px] bg-muted" />
+            <div className="grid grid-cols-3 gap-[10px]">
+              <div className="h-20 bg-muted rounded-[18px]" />
+              <div className="h-20 bg-muted rounded-[18px]" />
+              <div className="h-20 bg-muted rounded-[18px]" />
             </div>
-            <div className="h-64 bg-muted rounded-sm" />
+            <div className="h-64 bg-muted rounded-[18px]" />
           </div>
         </div>
       </PageLayout>
@@ -274,19 +178,16 @@ export default function Trends({ initialEntries }: TrendsProps) {
 
   return (
     <PageLayout>
-      <div className="pt-8 animate-fade-in">
-        <header className="mb-8">
-          <h1 className="text-heading">{PAGE_CONTENT.title}</h1>
-        </header>
+      <div className="pt-7 pb-6 flex flex-col gap-[14px]">
+        <h1 className="text-[24px] leading-[30px] font-semibold tracking-[-0.02em] text-[#1c211d]">
+          {PAGE_CONTENT.title}
+        </h1>
 
-        {/* Time range selector */}
-        <div className="mb-8">
-          <TimeRangeSelector value={range} onChange={setRange} />
-        </div>
+        <TimeRangeSelector value={range} onChange={handleRangeChange} />
 
         {entries.length === 0 ? (
           <div className="text-center py-16 space-y-4">
-            <p className="text-muted-foreground">{PAGE_CONTENT.emptyState}</p>
+            <p className="text-[#8a908b]">{PAGE_CONTENT.emptyState}</p>
             <Link
               href="/"
               className="inline-block text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 transition-colors"
@@ -296,42 +197,37 @@ export default function Trends({ initialEntries }: TrendsProps) {
           </div>
         ) : (
           <>
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-10">
-              <StatsCard label={PAGE_CONTENT.stats.average} value={stats.avg} />
-              <StatsCard label={PAGE_CONTENT.stats.worst} value={stats.worst} />
-              <StatsCard label={PAGE_CONTENT.stats.best} value={stats.best} />
+            <div className="grid grid-cols-3 gap-[10px]">
+              <StatsCard label="AVERAGE" value={stats.avg} />
+              <StatsCard label="WORST" value={stats.worst} />
+              <StatsCard label="BEST" value={stats.best} />
             </div>
 
-            <p className="text-xs text-muted-foreground text-center mb-6">
-              Showing {rangeLabel}
-            </p>
-
-            {/* Chart */}
             {chartData.length > 1 ? (
-              <div className="bg-card border border-border rounded-sm p-4 mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-medium text-muted-foreground">
-                    {PAGE_CONTENT.chartTitle}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {chartData.length} {chartData.length === 1 ? 'entry' : 'entries'}
-                  </p>
+              <div className="bg-white rounded-[18px] pt-[18px] px-[14px] pb-[14px] shadow-[0_1px_2px_rgba(12,12,12,0.05)] flex flex-col gap-2">
+                <div className="flex items-center justify-between px-[6px]">
+                  <h2 className="text-[14px] font-semibold text-[#1c211d]">Pain level</h2>
+                  <p className="text-[12px] text-[#ababab]">{rangeLabel}</p>
                 </div>
-                <div className="h-64 md:h-80" role="img" aria-label={`Pain level chart showing ${chartData.length} entries over ${rangeLabel}`}>
+                <div className="h-64 md:h-80" role="img" aria-label={`Pain level chart showing ${chartData.length} entries`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                    <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                      <defs>
+                        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#008391" stopOpacity={0.16} />
+                          <stop offset="100%" stopColor="#008391" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--border))"
+                        strokeDasharray=""
+                        stroke="#eef1ee"
                         vertical={false}
-                        opacity={0.3}
                       />
                       <XAxis
                         dataKey="date"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10.5, fill: '#919191' }}
                         interval="preserveStartEnd"
                         height={40}
                       />
@@ -339,35 +235,109 @@ export default function Trends({ initialEntries }: TrendsProps) {
                         domain={[0, 10]}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: '#ababab' }}
                         ticks={[0, 2, 4, 6, 8, 10]}
                         width={30}
                       />
-                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} />
+                      <Area
+                        type="monotone"
+                        dataKey="pain"
+                        fill="url(#areaGradient)"
+                        stroke="none"
+                        dot={false}
+                        activeDot={false}
+                        animationDuration={300}
+                      />
                       <Line
                         type="monotone"
                         dataKey="pain"
-                        stroke="hsl(var(--foreground))"
-                        strokeWidth={2}
-                        dot={<CustomDot />}
-                        activeDot={{ r: 6, strokeWidth: 2 }}
+                        stroke="#008391"
+                        strokeWidth={2.5}
+                        dot={(props: { cx?: number; cy?: number; payload?: ChartDataPoint }) => {
+                          const { cx, cy, payload } = props;
+                          if (cx === undefined || cy === undefined || !payload) return <g key="empty" />;
+                          const color = getPainColor(payload.pain);
+                          const isSelected = payload.timestamp === selectedPoint?.timestamp;
+                          return (
+                            <g key={payload.timestamp}>
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={13}
+                                fill="transparent"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => setSelectedPoint(payload)}
+                              />
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={isSelected ? 6 : 4}
+                                fill={color}
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              />
+                            </g>
+                          );
+                        }}
+                        activeDot={false}
                         animationDuration={300}
                       />
-                    </LineChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  {PAGE_CONTENT.chartHint}
+
+                {selectedPoint ? (
+                  <SelectedPointDetail point={selectedPoint} />
+                ) : null}
+
+                <p className="text-[11.5px] text-[#ababab] text-center">
+                  Tap points for details
                 </p>
               </div>
             ) : (
-              <div className="bg-card border border-border rounded-sm p-8 text-center">
-                <p className="text-muted-foreground">{PAGE_CONTENT.chartEmptyState}</p>
+              <div className="bg-white rounded-[18px] shadow-[0_1px_2px_rgba(12,12,12,0.05)] p-8 text-center">
+                <p className="text-[#8a908b]">{PAGE_CONTENT.chartEmptyState}</p>
               </div>
             )}
           </>
         )}
       </div>
     </PageLayout>
+  );
+}
+
+function SelectedPointDetail({ point }: { point: ChartDataPoint }) {
+  const color = getPainColor(point.pain);
+  const visuals = getPainLevelVisuals(point.pain);
+  const dateStr = format(parseISO(point.timestamp), 'MMM d, yyyy · h:mm a');
+
+  const metaParts: string[] = [];
+  if (point.primaryDisc) metaParts.push(point.primaryDisc);
+  if (point.spineRegion) {
+    metaParts.push(point.spineRegion.charAt(0).toUpperCase() + point.spineRegion.slice(1));
+  }
+  const metaStr = metaParts.length > 0
+    ? metaParts.join(' · ')
+    : (point.sensations?.map(getSensationLabel).join(', ') || '—');
+
+  return (
+    <div className="bg-[#f7f9f7] rounded-[14px] px-[14px] py-[12px] flex items-center gap-3 mt-0.5">
+      <span
+        className="font-mono text-[26px] font-semibold leading-none"
+        style={{ color }}
+      >
+        {point.pain}
+      </span>
+      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span className="text-[13px] font-semibold text-[#1c211d] truncate">{dateStr}</span>
+        <span className="text-[12px] text-[#777777] truncate">{metaStr}</span>
+      </div>
+      <span
+        className="px-[11px] py-1 rounded-full text-[12px] font-semibold shrink-0"
+        style={{ background: visuals.surface, color: visuals.accent }}
+      >
+        {visuals.severity}
+      </span>
+    </div>
   );
 }

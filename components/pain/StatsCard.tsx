@@ -1,6 +1,6 @@
 'use client';
 
-import { cn, getPainLevelClass } from '@/lib/utils';
+import { cn, getPainColor } from '@/lib/utils';
 
 interface StatsCardProps {
     label: string;
@@ -15,12 +15,15 @@ export function StatsCard({
     showPainColor = true,
     className
 }: StatsCardProps) {
-    const valueColorClass = showPainColor ? getPainLevelClass(value) : 'text-foreground';
+    const valueColor = showPainColor ? getPainColor(value) : 'hsl(var(--foreground))';
 
     return (
-        <div className={cn('text-center flex flex-col', className)}>
-            <p className="text-label mb-2 min-h-[2.5rem] flex items-center justify-center">{label}</p>
-            <p className={cn('text-4xl font-semibold tabular-nums', valueColorClass)}>
+        <div className={cn('bg-white rounded-2xl py-[14px] px-2 shadow-[0_1px_2px_rgba(12,12,12,0.05)] flex flex-col items-center gap-1', className)}>
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-[#919191]">{label}</p>
+            <p
+                className="font-mono text-[30px] font-semibold leading-none"
+                style={{ color: valueColor }}
+            >
                 {value}
             </p>
         </div>

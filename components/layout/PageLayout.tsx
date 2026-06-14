@@ -10,7 +10,7 @@ interface PageLayoutProps {
 export function PageLayout({ children }: PageLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
-      <main className="pb-20 max-w-lg mx-auto px-6 md:px-8">
+      <main className="mx-auto max-w-[430px] px-5 pb-[98px]">
         {children}
       </main>
       <BottomNav />

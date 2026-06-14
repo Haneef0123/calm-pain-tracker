@@ -34,9 +34,9 @@ export function RadiationSelector({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-label">Radiation Path</span>
-        <span className="text-xs text-muted-foreground">{regionLabel}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-label text-[#1c211d]">Does it travel anywhere?</span>
+        <span className="text-xs text-[#ababab]">{regionLabel}</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {radiationOptions.map((option) => {
@@ -49,10 +49,10 @@ export function RadiationSelector({
               type="button"
               onClick={() => toggleOption(option)}
               className={cn(
-                'px-3 py-1.5 text-sm rounded-sm border transition-all duration-100',
+                'rounded-full border px-[14px] py-2 text-[13px] font-medium transition-all duration-150',
                 isSelected
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-transparent text-foreground border-border hover:border-foreground'
+                  ? 'border-[#181b19] bg-[#181b19] text-white'
+                  : 'border-[#e1e4e1] bg-white text-[#3b3b3b] hover:border-[#181b19]'
               )}
             >
               {label}
@@ -60,13 +60,6 @@ export function RadiationSelector({
           );
         })}
       </div>
-      {value.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {spineRegion === 'cervical'
-            ? 'Pain radiating from neck follows C5-C7 nerve roots'
-            : 'Pain radiating from lower back follows sciatic nerve (L4-S1)'}
-        </p>
-      )}
     </div>
   );
 }

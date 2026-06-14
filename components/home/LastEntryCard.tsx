@@ -1,99 +1,91 @@
 'use client';
 
-import { formatDistanceToNow } from 'date-fns';
-import { usePainEntries } from '@/hooks/use-pain-entries';
-import { cn, getPainLevelClass } from '@/lib/utils';
 import { Star } from 'lucide-react';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { usePainEntries } from '@/hooks/use-pain-entries';
+import { getPainLevelVisuals } from '@/lib/utils';
+import { getPrimaryDisc, getSensationLabel } from '@/types/pain-entry';
 
 export function LastEntryCard() {
   const { entries, isLoaded, isFetching } = usePainEntries();
 
-  // Get the most recent entry
   const lastEntry = entries?.[0];
 
   if (!isLoaded || isFetching) {
     return (
-      <div className="bg-card/30 border border-border/30 rounded-lg p-5 animate-pulse">
-        <div className="h-4 bg-muted rounded w-24 mb-3" />
-        <div className="h-8 bg-muted rounded w-16 mb-2" />
-        <div className="h-3 bg-muted rounded w-32" />
+      <div className="animate-pulse rounded-[18px] border border-black/5 bg-white px-[18px] py-4 shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="h-[10px] w-20 rounded-full bg-[#edf0ed]" />
+          <div className="h-3 w-14 rounded-full bg-[#edf0ed]" />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-md bg-[#edf0ed]" />
+          <div className="h-7 w-16 rounded-full bg-[#edf0ed]" />
+          <div className="h-4 w-28 rounded-full bg-[#edf0ed]" />
+        </div>
       </div>
     );
   }
 
   if (!lastEntry) {
     return (
-      <div className="bg-card/30 border border-border/30 rounded-lg p-5 text-center">
-        <p className="text-sm text-muted-foreground">
-          No entries yet. Start tracking today!
+      <div className="rounded-[18px] border border-black/5 bg-white px-[18px] py-4 shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
+        <p className="text-[13px] text-[#777777]">
+          No entries yet. Start tracking today.
         </p>
       </div>
     );
   }
 
-  const timeAgo = formatDistanceToNow(new Date(lastEntry.timestamp), {
+  const timeAgo = formatDistanceToNowStrict(new Date(lastEntry.timestamp), {
     addSuffix: true,
   });
-
-  // Get primary disc
-  const primaryDisc = lastEntry.discs?.find((d) => d.role === 'primary');
-  const secondaryDiscs = lastEntry.discs?.filter((d) => d.role === 'secondary') || [];
+  const primaryDisc = getPrimaryDisc(lastEntry);
+  const painVisuals = getPainLevelVisuals(lastEntry.painLevel);
+  const regionLabel =
+    lastEntry.spineRegion === 'cervical'
+      ? 'Cervical'
+      : lastEntry.spineRegion === 'lumbar'
+        ? 'Lumbar'
+        : 'General';
+  const firstSensation = lastEntry.sensations?.[0]
+    ? getSensationLabel(lastEntry.sensations[0]).toLowerCase()
+    : null;
+  const metaLabel = firstSensation
+    ? `${regionLabel} · ${firstSensation}`
+    : regionLabel;
 
   return (
-    <div className="bg-card/50 border border-border/50 rounded-lg p-5">
-      <div className="flex items-start justify-between gap-4">
-        {/* Left: Entry Info */}
-        <div className="space-y-2 min-w-0">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">
-            Last Entry
-          </p>
-          
-          {/* Pain Level */}
-          <p className={cn('text-3xl font-bold', getPainLevelClass(lastEntry.painLevel))}>
-            {lastEntry.painLevel}
-          </p>
-
-          {/* Disc Info */}
-          {primaryDisc && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-foreground text-background rounded-sm text-sm">
-                <Star className="w-3 h-3 text-yellow-400" fill="currentColor" />
-                {primaryDisc.level}
-              </span>
-              {secondaryDiscs.map((disc) => (
-                <span
-                  key={disc.level}
-                  className="px-2 py-0.5 bg-muted text-foreground rounded-sm text-sm"
-                >
-                  {disc.level}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Spine Region */}
-          {lastEntry.spineRegion && (
-            <p className="text-xs text-muted-foreground capitalize">
-              {lastEntry.spineRegion} region
-            </p>
-          )}
-        </div>
-
-        {/* Right: Time */}
-        <div className="text-right flex-shrink-0">
-          <p className="text-xs text-muted-foreground">{timeAgo}</p>
-        </div>
+    <div className="rounded-[18px] border border-black/5 bg-white px-[18px] py-4 shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
+      <div className="mb-[10px] flex items-baseline justify-between gap-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#919191]">
+          Last entry
+        </span>
+        <span className="text-[12px] text-[#ababab]">{timeAgo}</span>
       </div>
 
-      {/* Sensations preview */}
-      {lastEntry.sensations && lastEntry.sensations.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-border/30">
-          <p className="text-xs text-muted-foreground">
-            {lastEntry.sensations.slice(0, 3).join(', ')}
-            {lastEntry.sensations.length > 3 && ` +${lastEntry.sensations.length - 3} more`}
-          </p>
-        </div>
-      )}
+      <div className="flex items-center gap-3">
+        <span
+          className="text-[28px] font-semibold leading-none"
+          style={{
+            color: painVisuals.accent,
+            fontFamily: '"Roboto Mono", ui-monospace, monospace',
+          }}
+        >
+          {lastEntry.painLevel}
+        </span>
+
+        {primaryDisc && (
+          <span className="inline-flex items-center gap-[5px] rounded-full bg-[#262626] px-[11px] py-1 text-[12px] font-semibold text-white">
+            <Star className="h-[11px] w-[11px] text-[#ffd20a]" fill="currentColor" />
+            {primaryDisc.level}
+          </span>
+        )}
+
+        <span className="min-w-0 truncate text-[13px] text-[#777777]">
+          {metaLabel}
+        </span>
+      </div>
     </div>
   );
 }

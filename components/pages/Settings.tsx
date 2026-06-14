@@ -1,28 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLayout } from '@/components/layout/PageLayout';
-import { Button } from '@/components/ui/button';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
-import { Download, Trash2, LogOut, UserX, BarChart3 } from 'lucide-react';
 import { AccountInfo } from '@/components/pain/AccountInfo';
-import Link from 'next/link';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import type { PainEntry } from '@/types/pain-entry';
 
 interface SettingsProps {
     entryCount: number;
@@ -30,16 +16,107 @@ interface SettingsProps {
     showAdminAnalytics: boolean;
 }
 
+interface SettingsRowProps {
+    icon: ReactNode;
+    label: string;
+    onClick: () => void | Promise<void>;
+    disabled?: boolean;
+    danger?: boolean;
+}
+
+const RowDivider = () => <div className="mx-[18px] h-px bg-[#f0f2f0]" />;
+
+function SettingsRow({ icon, label, onClick, disabled = false, danger = false }: SettingsRowProps) {
+    return (
+        <button
+            type="button"
+            onClick={() => {
+                void onClick();
+            }}
+            disabled={disabled}
+            className={[
+                'flex w-full items-center gap-[14px] border-none bg-transparent px-[18px] py-[15px] text-left font-[inherit] text-[14px] transition-colors',
+                danger
+                    ? 'font-semibold text-[#d53627] hover:bg-[#fdf7f6]'
+                    : 'font-medium text-[#1c211d] hover:bg-[#fafbfa]',
+                disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+            ].join(' ')}
+        >
+            <span className={danger ? 'text-current' : 'text-[#525252]'} aria-hidden="true">
+                {icon}
+            </span>
+            <span className="flex-1">{label}</span>
+            {!danger && (
+                <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    stroke="#c6c6c6"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                >
+                    <path d="M8 5l5 5-5 5" />
+                </svg>
+            )}
+        </button>
+    );
+}
+
+function armConfirmation(
+    setConfirming: Dispatch<SetStateAction<boolean>>,
+    timerRef: MutableRefObject<number | null>,
+) {
+    setConfirming(true);
+    if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+    }
+    timerRef.current = window.setTimeout(() => {
+        setConfirming(false);
+        timerRef.current = null;
+    }, 3000);
+}
+
+function clearConfirmation(
+    setConfirming: Dispatch<SetStateAction<boolean>>,
+    timerRef: MutableRefObject<number | null>,
+) {
+    setConfirming(false);
+    if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+    }
+}
+
 export default function Settings({ entryCount, userEmail, showAdminAnalytics }: SettingsProps) {
-    // Use hook without initial data - it will fetch on demand when needed
-    const { entries, exportToCsv, clearAllEntries } = usePainEntries();
-    // Use the SSR-provided count for display, or fall back to client-fetched length
-    const displayCount = entries.length > 0 ? entries.length : entryCount;
+    const { entries, exportToCsv, clearAllEntries, isLoaded } = usePainEntries();
+    const displayCount = isLoaded ? entries.length : entryCount;
     const { signOut } = useAuth();
     const router = useRouter();
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [isClearingEntries, setIsClearingEntries] = useState(false);
+    const [confirmingClear, setConfirmingClear] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const supabase = createClient();
+    const clearTimerRef = useRef<number | null>(null);
+    const deleteTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        const clearTimer = clearTimerRef.current;
+        const deleteTimer = deleteTimerRef.current;
+
+        return () => {
+            if (clearTimer) {
+                window.clearTimeout(clearTimer);
+            }
+            if (deleteTimer) {
+                window.clearTimeout(deleteTimer);
+            }
+        };
+    }, []);
 
     const handleExport = () => {
         if (entries.length === 0) {
@@ -49,6 +126,7 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
             });
             return;
         }
+
         exportToCsv();
         toast({
             title: 'Export complete',
@@ -73,7 +151,9 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
     };
 
     const handleDeleteAccount = async () => {
+        clearConfirmation(setConfirmingDelete, deleteTimerRef);
         setIsDeletingAccount(true);
+
         try {
             const { error } = await supabase.rpc('delete_user');
 
@@ -104,6 +184,9 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
     };
 
     const handleClearAll = async () => {
+        clearConfirmation(setConfirmingClear, clearTimerRef);
+        setIsClearingEntries(true);
+
         try {
             await clearAllEntries();
             toast({
@@ -111,119 +194,171 @@ export default function Settings({ entryCount, userEmail, showAdminAnalytics }: 
                 description: 'All entries have been deleted.',
             });
         } catch {
-            // Error already shown by hook
+            // Error already shown by hook.
+        } finally {
+            setIsClearingEntries(false);
         }
+    };
+
+    const handleClearRowClick = async () => {
+        if (isClearingEntries) {
+            return;
+        }
+
+        if (!confirmingClear) {
+            armConfirmation(setConfirmingClear, clearTimerRef);
+            return;
+        }
+
+        await handleClearAll();
+    };
+
+    const handleDeleteRowClick = async () => {
+        if (isDeletingAccount) {
+            return;
+        }
+
+        if (!confirmingDelete) {
+            armConfirmation(setConfirmingDelete, deleteTimerRef);
+            return;
+        }
+
+        await handleDeleteAccount();
     };
 
     return (
         <PageLayout>
-            <div className="pt-8 animate-fade-in">
-                <header className="mb-8">
-                    <h1 className="text-heading">Settings</h1>
-                </header>
+            <div className="flex flex-col gap-[14px] pb-6 pt-7">
+                <h1 className="text-[24px] font-semibold leading-[30px] tracking-[-0.02em] text-[#1c211d]">
+                    Settings
+                </h1>
 
-                <div className="h-px bg-border my-6" />
+                <AccountInfo email={userEmail} entryCount={displayCount} />
 
-                <div className="mb-8">
-                    <AccountInfo email={userEmail} entryCount={displayCount} />
-                </div>
-
-                <div className="space-y-4">
+                <div className="flex flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
                     {showAdminAnalytics && (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="w-full justify-start h-12 bg-card border-border"
-                        >
-                            <Link href="/admin/analytics">
-                                <BarChart3 className="w-4 h-4 mr-3" />
-                                Admin analytics
-                            </Link>
-                        </Button>
+                        <>
+                            <SettingsRow
+                                label="Admin analytics"
+                                onClick={() => router.push('/admin/analytics')}
+                                icon={(
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.6"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M4 16V9M10 16V4M16 16v-5" />
+                                    </svg>
+                                )}
+                            />
+                            <RowDivider />
+                        </>
                     )}
 
-                    <Button
-                        variant="outline"
-                        className="w-full justify-start h-12 bg-card border-border"
+                    <SettingsRow
+                        label="Export CSV"
                         onClick={handleExport}
-                    >
-                        <Download className="w-4 h-4 mr-3" />
-                        Export CSV
-                    </Button>
-
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="outline"
-                                className="w-full justify-start h-12 border-border"
+                        icon={(
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
-                                <Trash2 className="w-4 h-4 mr-3" />
-                                Clear all entries
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-card">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Clear all entries?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will permanently delete all {displayCount} pain entries.
-                                    Consider exporting your data first. This action cannot be undone.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleClearAll}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                    Delete all
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                                <path d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5M4 16h12" />
+                            </svg>
+                        )}
+                    />
+                    <RowDivider />
+                    <SettingsRow
+                        label={
+                            isClearingEntries
+                                ? 'Clearing entries...'
+                                : confirmingClear
+                                  ? `Confirm clear all ${displayCount} entries`
+                                  : 'Clear all entries'
+                        }
+                        onClick={handleClearRowClick}
+                        disabled={isClearingEntries}
+                        icon={(
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m2.5 0-.7 9a1.8 1.8 0 0 1-1.8 1.7H8a1.8 1.8 0 0 1-1.8-1.7l-.7-9" />
+                            </svg>
+                        )}
+                    />
+                </div>
 
-                    <div className="h-px bg-border my-6" />
-
-                    <Button
-                        variant="outline"
-                        className="w-full justify-start h-12 border-border"
+                <div className="flex flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
+                    <SettingsRow
+                        label={isSigningOut ? 'Signing out...' : 'Sign out'}
                         onClick={handleSignOut}
                         disabled={isSigningOut}
-                    >
-                        <LogOut className="w-4 h-4 mr-3" />
-                        {isSigningOut ? 'Signing out...' : 'Sign out'}
-                    </Button>
-
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="outline"
-                                className="w-full justify-start h-12 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                        icon={(
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
-                                <UserX className="w-4 h-4 mr-3" />
-                                Delete account
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-card">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will permanently delete your account and all {displayCount} pain entries.
-                                    This action cannot be undone.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleDeleteAccount}
-                                    disabled={isDeletingAccount}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                    {isDeletingAccount ? 'Deleting...' : 'Delete account'}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                                <path d="M8 17H5a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 5 3h3M13 14l4-4-4-4M17 10H8" />
+                            </svg>
+                        )}
+                    />
+                    <RowDivider />
+                    <SettingsRow
+                        label={
+                            isDeletingAccount
+                                ? 'Deleting account...'
+                                : confirmingDelete
+                                  ? `Confirm delete account and ${displayCount} entries`
+                                  : 'Delete account'
+                        }
+                        onClick={handleDeleteRowClick}
+                        disabled={isDeletingAccount}
+                        danger
+                        icon={(
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <circle cx="8" cy="6.5" r="3" />
+                                <path d="M3 17c0-2.8 2.2-5 5-5 1 0 1.9.3 2.7.8M14 13l4 4M18 13l-4 4" />
+                            </svg>
+                        )}
+                    />
                 </div>
+
+                <p className="mt-1 text-center text-[11.5px] text-[#ababab]">
+                    Pain Tracker · Your data stays yours
+                </p>
             </div>
         </PageLayout>
     );

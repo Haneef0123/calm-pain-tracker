@@ -1,74 +1,82 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SPINE_HEALTH_TIPS } from '@/content/tips';
 import { cn } from '@/lib/utils';
 
-const TIP_ROTATION_INTERVAL = 5000; // 5 seconds
+const TIP_ROTATION_INTERVAL = 5000;
+const TIP_FADE_DURATION_MS = 300;
 
 export function RotatingTips() {
+  const homeTips = useMemo(
+    () =>
+      SPINE_HEALTH_TIPS.filter((tip) =>
+        ['tip-2', 'tip-5', 'tip-3', 'tip-6', 'tip-8'].includes(tip.id)
+      ),
+    []
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+  const fadeTimeoutRef = useRef<number | null>(null);
+
+  const currentTip = homeTips[currentIndex];
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Fade out
-      setIsVisible(false);
+    const clearFadeTimeout = () => {
+      if (fadeTimeoutRef.current) {
+        window.clearTimeout(fadeTimeoutRef.current);
+        fadeTimeoutRef.current = null;
+      }
+    };
 
-      // After fade out, change tip and fade in
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % SPINE_HEALTH_TIPS.length);
+    const interval = window.setInterval(() => {
+      setIsVisible(false);
+      clearFadeTimeout();
+      fadeTimeoutRef.current = window.setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % homeTips.length);
         setIsVisible(true);
-      }, 300); // Match the CSS transition duration
+        fadeTimeoutRef.current = null;
+      }, TIP_FADE_DURATION_MS);
     }, TIP_ROTATION_INTERVAL);
 
-    return () => clearInterval(interval);
-  }, []);
-
-  const currentTip = SPINE_HEALTH_TIPS[currentIndex];
+    return () => {
+      window.clearInterval(interval);
+      clearFadeTimeout();
+    };
+  }, [homeTips.length]);
 
   return (
     <div className="relative overflow-hidden">
-      {/* Tip Card */}
       <div
         className={cn(
-          'bg-card/50 border border-border/50 rounded-lg p-5',
+          'rounded-[16px] border border-[#dcf5f7] bg-[#f2fbfc] px-4 py-[13px]',
           'transition-all duration-300 ease-in-out',
-          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         )}
       >
-        <div className="flex items-start gap-4">
-          <span className="text-2xl flex-shrink-0" role="img" aria-hidden>
-            {currentTip.icon}
-          </span>
-          <div className="space-y-1 min-w-0">
-            <h3 className="text-sm font-medium text-foreground">
-              {currentTip.title}
-            </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {currentTip.text}
-            </p>
-          </div>
-        </div>
+        <p className="text-[13px] leading-[19px] text-[#005b65]">
+          <strong>{currentTip.title}.</strong> {currentTip.text}
+        </p>
       </div>
 
-      {/* Progress Dots */}
-      <div className="flex justify-center gap-1.5 mt-4">
-        {SPINE_HEALTH_TIPS.map((tip, index) => (
+      <div className="mt-2 flex gap-[5px]">
+        {homeTips.map((tip, index) => (
           <button
             key={tip.id}
+            type="button"
             onClick={() => {
-              setIsVisible(false);
-              setTimeout(() => {
-                setCurrentIndex(index);
-                setIsVisible(true);
-              }, 300);
+              if (fadeTimeoutRef.current) {
+                window.clearTimeout(fadeTimeoutRef.current);
+                fadeTimeoutRef.current = null;
+              }
+              setCurrentIndex(index);
+              setIsVisible(true);
             }}
             className={cn(
-              'w-1.5 h-1.5 rounded-full transition-all duration-200',
+              'rounded-full transition-all duration-200',
               index === currentIndex
-                ? 'bg-foreground w-4'
-                : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                ? 'h-[5px] w-[14px] bg-[#008391]'
+                : 'h-[5px] w-[5px] bg-[#b7ebf0] hover:bg-[#8fdde5]'
             )}
             aria-label={`Go to tip ${index + 1}`}
           />

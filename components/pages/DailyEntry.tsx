@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -28,7 +28,7 @@ import {
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { usePainEntryForm } from '@/hooks/use-pain-entry-form';
 import { toast } from '@/hooks/use-toast';
-import { cn, getPainLevelClass } from '@/lib/utils';
+import { getPainLevelVisuals } from '@/lib/utils';
 
 // Content separated from JSX
 const FORM_CONTENT = {
@@ -55,6 +55,14 @@ const FORM_CONTENT = {
   },
 } as const;
 
+const SAVE_OVERLAY_DURATION_MS = 1800;
+const SAVE_OVERLAY_STORAGE_KEY = 'painmap-log-today-overlay';
+
+interface SaveOverlayPayload {
+  accent: string;
+  expiresAt: number;
+}
+
 /** Count how many optional detail fields the user has customized */
 function getDetailCount(form: {
   sensations: string[];
@@ -73,27 +81,100 @@ function getDetailCount(form: {
 }
 
 export default function DailyEntry() {
-  const { entries, addEntry, isAddingEntry } = usePainEntries();
+  const { addEntry, isAddingEntry } = usePainEntries();
   const form = usePainEntryForm();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [saveOverlayAccent, setSaveOverlayAccent] = useState<string | null>(null);
+  const saveOverlayTimerRef = useRef<number | null>(null);
 
   const today = new Date();
-  const entryCount = entries?.length ?? 0;
   const detailCount = getDetailCount(form);
+  const painVisuals = getPainLevelVisuals(form.painLevel);
+
+  const clearSaveOverlay = () => {
+    if (saveOverlayTimerRef.current) {
+      window.clearTimeout(saveOverlayTimerRef.current);
+      saveOverlayTimerRef.current = null;
+    }
+
+    window.sessionStorage.removeItem(SAVE_OVERLAY_STORAGE_KEY);
+    setSaveOverlayAccent(null);
+  };
+
+  const scheduleSaveOverlayClear = (expiresAt: number) => {
+    if (saveOverlayTimerRef.current) {
+      window.clearTimeout(saveOverlayTimerRef.current);
+    }
+
+    const remainingMs = Math.max(0, expiresAt - Date.now());
+    if (remainingMs === 0) {
+      clearSaveOverlay();
+      return;
+    }
+
+    saveOverlayTimerRef.current = window.setTimeout(() => {
+      clearSaveOverlay();
+    }, remainingMs);
+  };
+
+  const syncSaveOverlayFromStorage = () => {
+    const rawPayload = window.sessionStorage.getItem(SAVE_OVERLAY_STORAGE_KEY);
+    if (!rawPayload) {
+      setSaveOverlayAccent(null);
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(rawPayload) as SaveOverlayPayload;
+      if (!payload.accent || payload.expiresAt <= Date.now()) {
+        clearSaveOverlay();
+        return;
+      }
+
+      setSaveOverlayAccent(payload.accent);
+      scheduleSaveOverlayClear(payload.expiresAt);
+    } catch {
+      clearSaveOverlay();
+    }
+  };
+
+  useEffect(() => {
+    const handleSaveOverlaySync = () => {
+      syncSaveOverlayFromStorage();
+    };
+
+    syncSaveOverlayFromStorage();
+    window.addEventListener('painmap:save-overlay', handleSaveOverlaySync);
+
+    return () => {
+      if (saveOverlayTimerRef.current) {
+        window.clearTimeout(saveOverlayTimerRef.current);
+      }
+      window.removeEventListener('painmap:save-overlay', handleSaveOverlaySync);
+    };
+  }, []);
 
   const handleSave = async () => {
     const entryData = form.getEntryData();
     if (!entryData || !form.isValid) return;
 
     try {
+      const savedAccent = getPainLevelVisuals(entryData.painLevel).accent;
       await addEntry(entryData);
       form.reset();
       setDrawerOpen(false);
 
-      toast({
-        title: FORM_CONTENT.submit.successMessage,
-      });
+      const overlayPayload: SaveOverlayPayload = {
+        accent: savedAccent,
+        expiresAt: Date.now() + SAVE_OVERLAY_DURATION_MS,
+      };
+      window.sessionStorage.setItem(
+        SAVE_OVERLAY_STORAGE_KEY,
+        JSON.stringify(overlayPayload),
+      );
+      window.dispatchEvent(new Event('painmap:save-overlay'));
     } catch {
+      clearSaveOverlay();
       toast({
         title: 'Failed to save entry',
         variant: 'destructive',
@@ -103,33 +184,43 @@ export default function DailyEntry() {
 
   return (
     <PageLayout>
-      <div className="pt-8 space-y-8 animate-fade-in">
+      <div className="page-shell page-stack">
         {/* Date header */}
-        <header className="space-y-1">
-          <p className="text-label uppercase tracking-wider">
+        <header className="page-header">
+          <p className="page-kicker">
             {format(today, FORM_CONTENT.dateHeader.formatDay)}
           </p>
-          <h1 className="text-heading">
+          <h1 className="page-title">
             {format(today, FORM_CONTENT.dateHeader.formatFull)}
           </h1>
         </header>
 
-
-        <div className="divider" />
-
-        {/* Pain Level — always visible, default 5 */}
-        <div className="text-center space-y-2">
-          <p className="text-label">
-            {FORM_CONTENT.painLevel.label}
-          </p>
-          <p className={cn('text-display', getPainLevelClass(form.painLevel))}>
-            {form.painLevel}
-          </p>
+        {/* Pain Level — redesigned as a self-contained card */}
+        <div className="rounded-[18px] border border-black/5 bg-[var(--pain-card)] p-5 shadow-[0_1px_2px_rgba(12,12,12,0.05)]">
+          <div className="space-y-[14px]">
+            <p className="text-[13px] text-muted-foreground">
+              {FORM_CONTENT.painLevel.label}
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <p
+                className="text-[58px] font-semibold leading-none tracking-[-0.02em] tabular-nums"
+                style={{ color: painVisuals.accent }}
+              >
+                {form.painLevel}
+              </p>
+              <span
+                className="inline-flex rounded-full px-[14px] py-[6px] text-[13px] font-semibold leading-none"
+                style={{
+                  backgroundColor: painVisuals.surface,
+                  color: painVisuals.accent,
+                }}
+              >
+                {painVisuals.severity}
+              </span>
+            </div>
+            <PainSlider value={form.painLevel} onChange={form.setPainLevel} />
+          </div>
         </div>
-
-        <PainSlider value={form.painLevel} onChange={form.setPainLevel} />
-
-        <div className="divider" />
 
         {/* Area selector — always visible, plain language */}
         <SpineRegionSelector
@@ -138,15 +229,15 @@ export default function DailyEntry() {
         />
 
         {/* Two buttons side by side: Log today (primary) + Add details (secondary) */}
-        <div className="flex gap-3">
+        <div className="flex gap-[10px]">
           <Button
             onClick={handleSave}
-            disabled={!form.isValid || isAddingEntry}
-            className="flex-1 h-12 bg-foreground text-background hover:bg-foreground/90 transition-opacity duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!form.isValid || isAddingEntry || saveOverlayAccent !== null}
+            className="h-[52px] flex-[1.3] rounded-full bg-[#181b19] text-[15px] font-semibold text-white hover:bg-[#2c302d] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isAddingEntry ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Saving…
               </>
             ) : (
@@ -158,12 +249,12 @@ export default function DailyEntry() {
             variant="outline"
             disabled={!form.spineRegion}
             onClick={() => setDrawerOpen(true)}
-            className="flex-1 h-12 border-border hover:bg-card transition-colors duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-[52px] flex-1 rounded-full border border-[#dde2dd] bg-white text-[14px] font-semibold text-[#3b3b3b] hover:bg-[#f7f9f7] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <SlidersHorizontal className="w-4 h-4 mr-2" />
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
             {FORM_CONTENT.details.trigger}
             {detailCount > 0 && (
-              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-foreground text-background text-xs font-medium">
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#181b19] px-1 text-[11px] font-semibold text-white">
                 {detailCount}
               </span>
             )}
@@ -177,24 +268,61 @@ export default function DailyEntry() {
           </p>
         )}
 
-        <div className="divider" />
-
         {/* Context cards — always visible below */}
-        <div className="space-y-6 animate-fade-in">
+        <div className="animate-fade-in space-y-[14px]">
           <LastEntryCard />
           <RotatingTips />
         </div>
       </div>
 
+      {saveOverlayAccent && (
+        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-[430px] -translate-x-1/2 items-center justify-center bg-[rgba(255,255,255,0.93)] backdrop-blur-[4px]">
+          <div
+            aria-live="polite"
+            role="status"
+            className="animate-fade-up flex flex-col items-center gap-[6px] px-6 text-center"
+          >
+            <div
+              className="mb-[10px] flex h-[72px] w-[72px] animate-scale-in items-center justify-center rounded-full"
+              style={{ backgroundColor: saveOverlayAccent }}
+            >
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 34 34"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 18l6 6 12-13"
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <span className="text-[19px] font-semibold text-[#1c211d]">
+              {FORM_CONTENT.submit.successMessage}
+            </span>
+            <span className="text-[13px] text-[#777777]">Logged for today</span>
+          </div>
+        </div>
+      )}
+
       {/* Details Drawer (bottom sheet) */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent className="max-h-[85vh]">
-          <DrawerHeader>
-            <DrawerTitle>{FORM_CONTENT.details.title}</DrawerTitle>
-            <DrawerDescription>{FORM_CONTENT.details.description}</DrawerDescription>
+        <DrawerContent className="max-h-[88vh] overflow-hidden bg-white shadow-[0_-8px_40px_rgba(12,12,12,0.18)]">
+          <DrawerHeader className="gap-1 border-b border-[#eef1ee] px-6 pb-6 pt-5 text-left">
+            <DrawerTitle className="text-[17px] font-semibold leading-none tracking-[-0.01em] text-[#1c211d]">
+              {FORM_CONTENT.details.title}
+            </DrawerTitle>
+            <DrawerDescription className="text-[12.5px] text-[#919191]">
+              {FORM_CONTENT.details.description}
+            </DrawerDescription>
           </DrawerHeader>
 
-          <div className="overflow-y-auto px-4 pb-4 space-y-8">
+          <div className="overflow-y-auto px-6 py-[22px] space-y-10">
             {/* Disc Level (smart default pre-selected) */}
             {form.spineRegion && (
               <DiscLevelSelector
@@ -204,12 +332,8 @@ export default function DailyEntry() {
               />
             )}
 
-            <div className="divider" />
-
             {/* Sensations */}
             <SensationSelector value={form.sensations} onChange={form.setSensations} />
-
-            <div className="divider" />
 
             {/* Radiation Path */}
             {form.spineRegion && (
@@ -220,8 +344,6 @@ export default function DailyEntry() {
               />
             )}
 
-            <div className="divider" />
-
             {/* Aggravating Positions */}
             {form.spineRegion && (
               <AggravatorSelector
@@ -230,8 +352,6 @@ export default function DailyEntry() {
                 onChange={form.setAggravators}
               />
             )}
-
-            <div className="divider" />
 
             {/* Neurological Signs */}
             {form.spineRegion && (
@@ -242,11 +362,9 @@ export default function DailyEntry() {
               />
             )}
 
-            <div className="divider" />
-
             {/* Notes */}
             <div className="space-y-3">
-              <Label htmlFor="notes" className="text-label">
+              <Label htmlFor="notes" className="text-label text-[#1c211d]">
                 {FORM_CONTENT.notes.label}
               </Label>
               <Textarea
@@ -254,14 +372,14 @@ export default function DailyEntry() {
                 placeholder={FORM_CONTENT.notes.placeholder}
                 value={form.notes}
                 onChange={(e) => form.setNotes(e.target.value)}
-                className="min-h-24 bg-card border-border resize-none"
+                className="min-h-[92px] resize-none rounded-[14px] border-[#e1e4e1] bg-[#fafbfa] px-[14px] py-3 text-[13.5px] leading-5 text-[#1c211d] placeholder:text-[#9aa09a] focus-visible:ring-1 focus-visible:ring-[#008391] focus-visible:ring-offset-0"
               />
             </div>
           </div>
 
-          <DrawerFooter>
+          <DrawerFooter className="border-t border-[#f0f2f0] px-6 pb-6 pt-4">
             <DrawerClose asChild>
-              <Button className="w-full h-12 bg-foreground text-background hover:bg-foreground/90">
+              <Button className="h-[52px] w-full rounded-full bg-[#181b19] text-[15px] font-semibold text-white hover:bg-[#2c302d]">
                 {FORM_CONTENT.details.done}
               </Button>
             </DrawerClose>

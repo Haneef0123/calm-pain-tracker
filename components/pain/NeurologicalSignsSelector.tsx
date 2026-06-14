@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { AlertTriangle } from 'lucide-react';
 import {
   type SpineRegion,
   getNeuroSignsForRegion,
@@ -32,10 +31,7 @@ export function NeurologicalSignsSelector({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-label text-muted-foreground">Neurological Signs</span>
-        <span className="text-xs text-muted-foreground">(optional)</span>
-      </div>
+      <span className="text-label text-[#1c211d]">Any of these signs?</span>
       <div className="flex flex-wrap gap-2">
         {neuroSignOptions.map((option) => {
           const isSelected = value.includes(option);
@@ -47,10 +43,10 @@ export function NeurologicalSignsSelector({
               type="button"
               onClick={() => toggleOption(option)}
               className={cn(
-                'px-3 py-1.5 text-sm rounded-sm border transition-all duration-100',
+                'rounded-full border px-[14px] py-2 text-[13px] font-medium transition-all duration-150',
                 isSelected
-                  ? 'bg-destructive/20 text-destructive border-destructive'
-                  : 'bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground'
+                  ? 'border-[#181b19] bg-[#181b19] text-white'
+                  : 'border-[#e1e4e1] bg-white text-[#3b3b3b] hover:border-[#181b19]'
               )}
             >
               {label}
@@ -58,15 +54,6 @@ export function NeurologicalSignsSelector({
           );
         })}
       </div>
-      {value.length > 0 && (
-        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-sm">
-          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-destructive">
-            Neurological symptoms may indicate nerve compression. Consider medical evaluation
-            if symptoms persist or worsen.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

@@ -17,16 +17,16 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 
 export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     return (
-        <div className="flex gap-2">
+        <div className="flex bg-[#eaeeea] rounded-full p-1 gap-1">
             {TIME_RANGE_OPTIONS.map((option) => (
                 <button
                     key={option.value}
                     onClick={() => onChange(option.value)}
                     className={cn(
-                        'px-4 py-2 text-sm rounded-sm border transition-all duration-100',
+                        'flex-1 rounded-full py-[9px] px-2 text-[13px] font-semibold transition-all duration-150 border-none',
                         value === option.value
-                            ? 'bg-foreground text-background border-foreground'
-                            : 'bg-transparent text-foreground border-border hover:border-foreground'
+                            ? 'bg-white text-[#1c211d] shadow-[0_1px_2px_rgba(12,12,12,0.08)]'
+                            : 'bg-transparent text-[#6b716c]'
                     )}
                 >
                     {option.label}

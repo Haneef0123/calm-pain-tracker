@@ -52,9 +52,12 @@ const SMART_DEFAULTS: Record<SpineRegion, string> = {
 };
 
 const initialFormState: PainEntryFormState = {
-  spineRegion: null,
+  spineRegion: 'lumbar',
   cervical: { ...emptyRegionData },
-  lumbar: { ...emptyRegionData },
+  lumbar: {
+    ...emptyRegionData,
+    discs: [{ level: SMART_DEFAULTS.lumbar, role: 'primary' }],
+  },
   painLevel: 5,
   notes: '',
 };
