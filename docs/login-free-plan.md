@@ -24,7 +24,7 @@ with *zero* identity anchor: recognizing the same person on a new device require
 *something*. With no anchor, a new device or wiped browser is indistinguishable
 from a brand-new user and the data is unreachable.
 
-Therefore the design is **anonymous-first with a recovery passphrase** as the
+Therefore the design is **anonymous-first with a recovery code** as the
 anchor: no login screen up front, and a lightweight, account-less way to
 re-attach to the data when the user wants sync or moves devices.
 
@@ -37,7 +37,7 @@ re-attach to the data when the user wants sync or moves devices.
 | C | Local-first + optional cloud sync | Heavier; not needed since we keep Supabase |
 | D | Device-ID + relaxed RLS | Rejected — weakens security |
 | E | Shareable access code | Effectively the chosen anchor |
-| **Chosen** | **Anonymous-first + recovery passphrase (B + E)** | Meets all requirements, keeps RLS unchanged |
+| **Chosen** | **Anonymous-first + recovery code (B + E)** | Meets all requirements, keeps RLS unchanged |
 
 ## High-level design
 
@@ -62,21 +62,23 @@ analytics aggregates over everyone uniformly.
 2. The app is usable immediately — **no login UI**.
 3. Pain entries save to the cloud under the anonymous `user_id`.
 
-### Recovery passphrase (the crux)
+### Recovery code (the crux)
 
 Implemented with **standard Supabase auth only** — no RLS changes:
 
-1. **Generate** a high-entropy passphrase (recommend ~12 BIP39-style words,
-   ≈128-bit; memorable and writable).
+1. **Generate** a recovery code: a **12-character Crockford base32** string
+   (~60-bit, crypto-secure RNG, ambiguous characters removed) displayed grouped
+   as `XXXX-XXXX-XXXX`. Case-insensitive on entry. No external wordlist
+   dependency.
 2. **Back up** (new server API route, service-role): convert the anonymous
    account into a permanent one by setting a **synthetic, non-user-facing email**
    derived from the user id on an **owned domain** (e.g.
    `<uid>@anon.<owned-domain>`, configured via
-   `RECOVERY_SYNTHETIC_EMAIL_DOMAIN`) with the **passphrase as the password**,
+   `RECOVERY_SYNTHETIC_EMAIL_DOMAIN`) with the **recovery code as the password**,
    auto-confirmed via the admin API (`email_confirm: true`, no email sent); store
-   `bcrypt(passphrase) -> email` in a new `recovery_codes` table.
-3. **Restore** on any device (`/track/restore`): user enters the passphrase ->
-   server looks up the email by hash -> `signInWithPassword(email, passphrase)`
+   `bcrypt(code) -> email` in a new `recovery_codes` table.
+3. **Restore** on any device (`/track/restore`): user enters the code ->
+   server looks up the email by hash -> `signInWithPassword(email, code)`
    -> sets session cookies. Both devices now share the **same `user_id`** ->
    true multi-device sync.
 
@@ -189,7 +191,7 @@ No persistent bottom tab bar (that's the existing app's pattern). Instead:
 | `RecoveryStatusCard` | Shows "Not backed up yet" (warning) or "Backed up ✓"; primary action opens the backup drawer. |
 | `BackupNudgeBanner` | Dismissible banner shown after the first entry when not yet backed up. |
 | `BackupDrawer` | Multi-step vaul bottom sheet: Intro → Reveal → Confirm. |
-| `PassphraseGrid` | 12-word grid (numbered), **Copy** and **Download .txt** actions. |
+| `RecoveryCodeCard` | Displays the `XXXX-XXXX-XXXX` code in large mono type, with **Copy** and **Download .txt** actions. |
 | `RestoreForm` | Passphrase input + Restore button; handles verifying/error/rate-limit states. |
 | `SwitchAccountDialog` | AlertDialog warning when switching would orphan local entries. |
 
@@ -249,10 +251,10 @@ States: first-run (no entries) · normal · saving · post-first-entry nudge.
 #### 3) Backup drawer (multi-step bottom sheet)
 - **Step 1 — Intro:** what a recovery code is, that it enables sync/restore, and
   the **no-reset caveat**. Button: *Generate my code*.
-- **Step 2 — Reveal:** `PassphraseGrid` shows the 12 numbered words; **Copy** and
+- **Step 2 — Reveal:** `RecoveryCodeCard` shows the `XXXX-XXXX-XXXX` code; **Copy** and
   **Download .txt**. Calls `/api/recovery/create`; shows a spinner while creating.
 - **Step 3 — Confirm:** checkbox *"I've saved my recovery code somewhere safe."*
-  (enables **Done**). Optional hardening: ask the user to retype word #N.
+  (enables **Done**). Optional hardening: ask the user to retype the code.
 - Error state: creation failed → inline retry.
 
 ```
@@ -267,8 +269,7 @@ States: first-run (no entries) · normal · saving · post-first-entry nudge.
         ▼ (after generate)
 ┌──────────────────────────────┐
 │ Your recovery code            │
-│ 1 river   2 metal   3 chair   │
-│ 4 ocean   5 ...     ...    12 │
+│      K7QM - 3FPX - 9TPB       │  (large mono, grouped)
 │ [ Copy ]   [ Download .txt ]  │
 │ ☐ I've saved it somewhere safe│
 │                     [ Done ]  │
@@ -282,10 +283,10 @@ switch-warning · success.
 ```
 ┌──────────────────────────────┐
 │ ←  Restore your data          │
-│ Enter the 12-word recovery    │
-│ code you saved.               │
+│ Enter the recovery code       │
+│ you saved.                    │
 │ ┌──────────────────────────┐  │
-│ │ river metal chair ocean … │  │  textarea
+│ │ K7QM-3FPX-9TPB            │  │  input
 │ └──────────────────────────┘  │
 │           [ Restore my data ] │
 │ ! That code didn't match.     │  (error variants below)
@@ -315,7 +316,7 @@ screen; only the header gains a back arrow and the empty-state link points to
   back — there's no email or password reset. Write it down or save it somewhere
   safe."**
 - Confirm checkbox: **"I've saved my recovery code somewhere safe."**
-- Restore prompt: **"Enter the 12-word recovery code you saved."**
+- Restore prompt: **"Enter the recovery code you saved."**
 - Delete confirm: **"This permanently deletes all your entries and your data.
   This can't be undone."**
 
@@ -340,7 +341,7 @@ New table only — no changes to `pain_entries` or its RLS policies:
 -- One active recovery code per user (regenerating replaces the row).
 create table public.recovery_codes (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  code_hash text not null,          -- bcrypt(passphrase)
+  code_hash text not null,          -- bcrypt(recovery code)
   synthetic_email text not null,    -- used for signInWithPassword
   created_at timestamptz not null default now()
 );
@@ -359,7 +360,7 @@ create index idx_redeem_attempts_ip_time
 ```
 
 ## Security considerations
-- The passphrase is the **only** key — there is no email reset. Show a prominent
+- The recovery code is the **only** key — there is no email reset. Show a prominent
   warning on generation and strongly nudge the user to save it.
 - High entropy + **rate-limiting / backoff** on `/api/recovery/redeem`
   (brute-force protection) via the Supabase `recovery_redeem_attempts` table
@@ -417,9 +418,12 @@ All previously-open items are now locked:
      un-backed-up entries behind before proceeding. Data merge/migration remains
      out of scope.
 
-6. **Passphrase library → `@scure/bip39`.** Use the audited, dependency-light
-   `@scure/bip39` with the English wordlist to generate a **12-word (128-bit)**
-   passphrase. Dependency accepted.
+6. **Recovery code format → 12-char Crockford base32 (~60-bit).** Generated with
+   a crypto-secure RNG (Node `crypto`), ambiguous characters (I, L, O, U, 0, 1)
+   removed, displayed grouped as `XXXX-XXXX-XXXX`, accepted case-insensitively.
+   No external wordlist dependency. ~60-bit is comfortably safe given bcrypt
+   storage + redeem rate-limiting, and far friendlier than a 12-word phrase for a
+   pain tracker.
 
 ### New environment variables
 - `RECOVERY_SYNTHETIC_EMAIL_DOMAIN` — owned domain used for synthetic emails.
