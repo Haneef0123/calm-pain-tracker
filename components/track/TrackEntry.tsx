@@ -28,8 +28,11 @@ import {
 import { useActionOverlay } from '@/components/ui/action-overlay';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { usePainEntryForm } from '@/hooks/use-pain-entry-form';
+import { useBackupStatus } from '@/hooks/use-backup-status';
 import { toast } from '@/hooks/use-toast';
 import { getPainLevelVisuals } from '@/lib/utils';
+import { BackupNudgeBanner } from './BackupNudgeBanner';
+import { BackupDrawer } from './BackupDrawer';
 
 const FORM_CONTENT = {
   painLevel: { label: 'How much pain?' },
@@ -67,10 +70,15 @@ function getDetailCount(form: {
 }
 
 export default function TrackEntry() {
-  const { addEntry, isAddingEntry } = usePainEntries();
+  const { addEntry, isAddingEntry, entries } = usePainEntries();
   const { showOverlay, clearOverlay, isVisible: isActionOverlayVisible } = useActionOverlay();
+  const { isBackedUp, markBackedUp } = useBackupStatus();
   const form = usePainEntryForm();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [backupDrawerOpen, setBackupDrawerOpen] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+
+  const showNudge = entries.length > 0 && !isBackedUp && !nudgeDismissed;
 
   const today = new Date();
   const detailCount = getDetailCount(form);
@@ -177,6 +185,14 @@ export default function TrackEntry() {
           </p>
         )}
 
+        {/* Backup nudge — shown after first entry until dismissed or backed up */}
+        {showNudge && (
+          <BackupNudgeBanner
+            onSave={() => setBackupDrawerOpen(true)}
+            onDismiss={() => setNudgeDismissed(true)}
+          />
+        )}
+
         {/* Context cards */}
         <div className="animate-fade-in space-y-[14px]">
           <LastEntryCard />
@@ -249,6 +265,16 @@ export default function TrackEntry() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Backup drawer — opened from nudge banner */}
+      <BackupDrawer
+        open={backupDrawerOpen}
+        onOpenChange={setBackupDrawerOpen}
+        onBackedUp={() => {
+          markBackedUp();
+          setNudgeDismissed(true);
+        }}
+      />
     </TrackShell>
   );
 }
