@@ -100,16 +100,26 @@ the existing (Google) app exists.
 ## Files involved
 
 ### New files (the feature is additive)
-- `app/track/page.tsx` — login-free landing + anonymous bootstrap.
+
+Routes (minimal scope — Today + Settings; History/backup reached from Settings):
+- `app/track/layout.tsx` — self-contained shell (no existing-app nav/links).
+- `app/track/page.tsx` — **Today** (log a check-in); primary screen.
+- `app/track/settings/page.tsx` — **Settings** (backup/restore, export, history,
+  clear, delete).
+- `app/track/history/page.tsx` — **Past days** (reached from Settings).
 - `app/track/restore/page.tsx` — restore-with-code screen.
-- `app/track/layout.tsx` — self-contained layout/nav (no links to existing app).
+
+API:
 - `app/api/recovery/create/route.ts` — generate code, set synthetic credentials,
   store hash.
 - `app/api/recovery/redeem/route.ts` — verify code, sign in, set cookies
   (rate-limited).
-- `supabase/migrations/<timestamp>_recovery_codes.sql` — new `recovery_codes`
-  table.
-- New UI components for the backup-code modal and the restore form.
+
+Database:
+- `supabase/migrations/<timestamp>_recovery_codes.sql` — new `recovery_codes` and
+  `recovery_redeem_attempts` tables.
+
+UI components: see the **UI / UX design** section below for the full inventory.
 
 ### Minimal additive touchpoints to existing files (no behavior replaced)
 - `middleware.ts` / `lib/supabase/middleware.ts` — **add** a `/track*` branch
@@ -127,6 +137,195 @@ the existing (Google) app exists.
   components. This keeps the existing app **100% untouched** and fully isolates
   `/track`, at the cost of some UI duplication. A future consolidation refactor
   is possible if/when touching shared components becomes acceptable.
+
+## UI / UX design
+
+### Principles
+- **Mirror the existing design language** (mobile-first, `max-w-[430px]`, the
+  pain-color tokens, Inter font, lucide icons, vaul drawers) so `/track` feels
+  native — while staying **fully self-contained** (no bottom-nav links to `/`,
+  `/history`, `/patterns`, `/settings`, `/sign-in`, or admin).
+- **Use first, anchor later.** Nothing blocks logging. The recovery code is
+  offered as a gentle, dismissible nudge after the first entry, and always
+  available in Settings.
+- **Minimal surface.** Two screens (Today, Settings); History and the
+  backup/restore flows are reached from Settings.
+
+### Navigation & screen map
+No persistent bottom tab bar (that's the existing app's pattern). Instead:
+
+```
+/track                 Today  ──(gear icon, top-right)──►  /track/settings
+   ▲                                                            │
+   └──────────────── back ◄─────────────────────────────────────┤
+                                                                 ├─► /track/history   (View past entries)
+                                                                 ├─► Backup drawer    (Save a recovery code)
+                                                                 └─► /track/restore   (Use a code / switch device)
+```
+
+- **Today** (`/track`) is home; a gear icon in the header opens Settings.
+- **Settings** and **History** are pushed pages with a back arrow to the previous
+  screen. None links to the existing app.
+
+### Design-system reuse (no changes to shared files)
+- **Reuse as-is** (pure, nav/auth-free): all `components/ui/*` (button, drawer,
+  textarea, label, alert-dialog, tooltip, sonner/toast, action-overlay); all
+  `components/pain/*` selectors + `PainSlider`, `ChipSelect`, `HistoryEntryCard`,
+  `StatsCard`, `PainTypeInfo`; `components/home/RotatingTips` + `LastEntryCard`.
+- **Reuse data hooks**: `usePainEntries`, `usePainEntryForm`, `useActionOverlay`,
+  `useToast`.
+- **Reuse tokens**: `app/globals.css` + `tailwind.config.ts` (unchanged).
+- **Inherit providers** from the existing root `app/layout.tsx` (QueryClient etc.)
+  — no provider duplication.
+
+### Component inventory (new, under `components/track/`)
+| Component | Purpose |
+|-----------|---------|
+| `TrackShell` | Layout wrapper: centered `max-w-[430px]`, padding, **no BottomNav**. |
+| `TrackHeader` | Title/date + a gear icon (Today) or a back arrow (sub-pages). |
+| `TrackEntry` | Duplicate of `DailyEntry` minus app-nav; composes reused selectors; hosts the post-first-entry nudge. |
+| `TrackSettings` | Backup/restore + export + history link + clear/delete. **No sign-out / Google / admin.** |
+| `TrackHistory` | Duplicate of `History` with back nav; empty-state link points to `/track` (not `/`). |
+| `RecoveryStatusCard` | Shows "Not backed up yet" (warning) or "Backed up ✓"; primary action opens the backup drawer. |
+| `BackupNudgeBanner` | Dismissible banner shown after the first entry when not yet backed up. |
+| `BackupDrawer` | Multi-step vaul bottom sheet: Intro → Reveal → Confirm. |
+| `PassphraseGrid` | 12-word grid (numbered), **Copy** and **Download .txt** actions. |
+| `RestoreForm` | Passphrase input + Restore button; handles verifying/error/rate-limit states. |
+| `SwitchAccountDialog` | AlertDialog warning when switching would orphan local entries. |
+
+### Screen specs, states & wireframes
+
+#### 1) Today (`/track`)
+States: first-run (no entries) · normal · saving · post-first-entry nudge.
+
+```
+┌──────────────────────────────┐
+│ MONDAY                    ⚙︎  │   ← gear → /track/settings
+│ June 20, 2026                 │
+│                               │
+│ ┌──── Pain level ──────────┐  │
+│ │   4        [ Moderate ]  │  │
+│ │   ●──────slider──────    │  │
+│ └──────────────────────────┘  │
+│ Spine region  [Cervical][Lumbar]
+│ [   Log today   ] [ Add details ]
+│                               │
+│ ⤵ (after 1st save, dismissible)│
+│ ┌──────────────────────────┐  │
+│ │ Save your data so you     │  │
+│ │ don't lose it.   [Save] ✕ │  │ ← opens BackupDrawer
+│ └──────────────────────────┘  │
+│ Last entry · Tips             │
+└──────────────────────────────┘
+```
+
+#### 2) Settings (`/track/settings`)
+```
+┌──────────────────────────────┐
+│ ←  Settings                   │
+│                               │
+│ ┌─ Recovery ───────────────┐  │
+│ │ ⚠ Not backed up yet       │  │  (or "✓ Backed up")
+│ │ Save a recovery code to    │  │
+│ │ sync & restore your data.  │  │
+│ │ [ Save a recovery code ]   │  │ → BackupDrawer
+│ │  Use a code from another   │  │ → /track/restore
+│ │  device                    │  │
+│ └──────────────────────────┘  │
+│ ┌──────────────────────────┐  │
+│ │ View past entries      ›  │  │ → /track/history
+│ │ ──────────────────────    │  │
+│ │ Export CSV             ⤓  │  │
+│ └──────────────────────────┘  │
+│ ┌──────────────────────────┐  │
+│ │ Clear all entries      🗑 │  │
+│ │ ──────────────────────    │  │
+│ │ Delete all data (danger)  │  │ → delete_user RPC
+│ └──────────────────────────┘  │
+│ Pain Tracker · Your data is yours
+└──────────────────────────────┘
+```
+
+#### 3) Backup drawer (multi-step bottom sheet)
+- **Step 1 — Intro:** what a recovery code is, that it enables sync/restore, and
+  the **no-reset caveat**. Button: *Generate my code*.
+- **Step 2 — Reveal:** `PassphraseGrid` shows the 12 numbered words; **Copy** and
+  **Download .txt**. Calls `/api/recovery/create`; shows a spinner while creating.
+- **Step 3 — Confirm:** checkbox *"I've saved my recovery code somewhere safe."*
+  (enables **Done**). Optional hardening: ask the user to retype word #N.
+- Error state: creation failed → inline retry.
+
+```
+┌──────────────────────────────┐
+│ ──                            │  (drag handle)
+│ Save a recovery code          │
+│ This is the ONLY way to get   │
+│ your data back. There's no    │
+│ email reset. Keep it safe.    │
+│           [ Generate my code ]│
+└──────────────────────────────┘
+        ▼ (after generate)
+┌──────────────────────────────┐
+│ Your recovery code            │
+│ 1 river   2 metal   3 chair   │
+│ 4 ocean   5 ...     ...    12 │
+│ [ Copy ]   [ Download .txt ]  │
+│ ☐ I've saved it somewhere safe│
+│                     [ Done ]  │
+└──────────────────────────────┘
+```
+
+#### 4) Restore (`/track/restore`)
+States: idle · verifying · invalid-code · rate-limited · network-error ·
+switch-warning · success.
+
+```
+┌──────────────────────────────┐
+│ ←  Restore your data          │
+│ Enter the 12-word recovery    │
+│ code you saved.               │
+│ ┌──────────────────────────┐  │
+│ │ river metal chair ocean … │  │  textarea
+│ └──────────────────────────┘  │
+│           [ Restore my data ] │
+│ ! That code didn't match.     │  (error variants below)
+└──────────────────────────────┘
+```
+- **invalid-code:** "That code didn't match. Check the words and try again."
+- **rate-limited:** "Too many attempts. Please try again in ~{n} minutes."
+- **network-error:** "Couldn't reach the server. Check your connection."
+- **switch-warning** (via `SwitchAccountDialog`, only if the current anonymous
+  session has ≥1 entry): "You have {n} entries on this device that aren't backed
+  up. Restoring switches to your saved data and leaves these behind." Actions:
+  *Back up these first* (→ BackupDrawer) · *Switch anyway*.
+- **success:** redirect to `/track` + toast "Welcome back — your data is restored."
+
+#### 5) History (`/track/history`)
+Reuses `HistoryEntryCard` (collapse/expand/delete) exactly as the existing
+screen; only the header gains a back arrow and the empty-state link points to
+`/track`.
+
+### User-facing copy (canonical strings)
+- Nudge banner: **"Save your data so you don't lose it."** / button **"Save"**.
+- Status (not backed up): **"Not backed up yet"** · sub: **"Save a recovery code
+  to sync and restore your data on any device."**
+- Status (backed up): **"Backed up ✓"** · sub: **"Use your recovery code to
+  restore on another device."**
+- Backup intro warning: **"This recovery code is the only way to get your data
+  back — there's no email or password reset. Write it down or save it somewhere
+  safe."**
+- Confirm checkbox: **"I've saved my recovery code somewhere safe."**
+- Restore prompt: **"Enter the 12-word recovery code you saved."**
+- Delete confirm: **"This permanently deletes all your entries and your data.
+  This can't be undone."**
+
+### Accessibility & responsive
+- Touch targets ≥ 44px (buttons are 52px, matching the app).
+- Drawer and dialogs use the existing Radix/vaul primitives (focus trap, ESC,
+  labelled). Passphrase grid words are selectable; Copy has an `aria-live`
+  confirmation.
+- Single-column, `max-w-[430px]`, safe-area insets respected — same as the app.
+- Dark mode inherited from the shared tokens automatically.
 
 ## Supabase project settings (configuration, not code)
 - Enable **Anonymous sign-ins**.
