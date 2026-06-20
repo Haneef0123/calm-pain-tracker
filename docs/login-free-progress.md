@@ -118,11 +118,55 @@
 
 ---
 
+---
+
+## Phase 3 — Restore: cross-device sync + switch warning ✅ Done
+
+**Branch:** `claude/login-free-phase-doc-pu0t2s`  
+**Date:** 2026-06-20
+
+### What was done
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `app/api/recovery/redeem/route.ts` | ✅ | Rate-limited (5 attempts / 15-min window per hashed IP); bcrypt scans `recovery_codes`; `signInWithPassword` sets session cookies via SSR client |
+| `components/track/SwitchAccountDialog.tsx` | ✅ | AlertDialog warning when restoring over un-backed-up local entries; "Back up these first" / "Switch anyway" |
+| `app/track/restore/page.tsx` | ✅ | Restore form; states: idle / verifying / invalid / rate-limited / network-error; wires `SwitchAccountDialog` + `BackupDrawer`; clears React Query cache before redirect |
+| `app/track/history/page.tsx` | ✅ | TrackHistory: back nav, `HistoryEntryCard`, empty-state link → `/track` |
+| `app/track/settings/page.tsx` (fleshed out) | ✅ | Full settings: RecoveryStatusCard, View past entries, Export CSV, Clear all (2-tap confirm), Delete all data (2-tap confirm, `delete_user` RPC) |
+
+### New / modified files
+- **New:** `app/api/recovery/redeem/route.ts`
+- **New:** `components/track/SwitchAccountDialog.tsx`
+- **New:** `app/track/restore/page.tsx`
+- **New:** `app/track/history/page.tsx`
+- **Modified:** `app/track/settings/page.tsx` — replaced minimal Phase 2 stub with full settings
+
+### How the restore flow works
+
+1. User enters a `XXXX-XXXX-XXXX` code on `/track/restore`.
+2. If the current device has un-backed-up entries (`!isBackedUp && entries.length > 0`), `SwitchAccountDialog` warns before proceeding.
+3. The client posts the normalized code to `POST /api/recovery/redeem`.
+4. The route checks rate limits (per-hashed-IP, 5 attempts / 15 min window via `recovery_redeem_attempts`).
+5. It fetches all `recovery_codes` rows and bcrypt-compares to find a match.
+6. On match, `supabase.auth.signInWithPassword({ email: syntheticEmail, password: code })` sets session cookies via the SSR client.
+7. The client clears the React Query cache and navigates to `/track`, which re-fetches the restored user's entries.
+
+### Acceptance checklist
+- [ ] Save code on browser A; enter it in fresh browser B → B shows A's entries; new entry in B appears in A after refresh
+- [ ] Wrong code → "That code didn't match" error message
+- [ ] Many attempts → rate-limited message with retry countdown
+- [ ] Restoring on a device with un-backed-up entries shows the switch warning first
+- [ ] "Back up these first" opens the BackupDrawer in-page
+- [ ] Settings: View past entries → `/track/history`; Export CSV downloads file; Clear all entries (2-tap) wipes data; Delete all data (2-tap) calls `delete_user` RPC
+- [ ] History page shows all entries with collapse/delete; empty state links to `/track`
+
+---
+
 ## Upcoming phases
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 3 | Restore: cross-device sync + switch warning | Not started |
 | 4 | Hardening, edge cases, a11y, polish | Not started |
 | 5 | Automated tests (E2E + unit) | Not started |
 | 6 | Production rollout | Not started |
