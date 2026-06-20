@@ -192,9 +192,70 @@
 
 ---
 
+---
+
+## Phase 5 — Automated tests (unit + E2E) ✅ Done
+
+**Branch:** `claude/login-free-plan-phases-po85ze`  
+**Date:** 2026-06-20
+
+### What was done
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Installed Vitest + `@vitest/coverage-v8` | ✅ | `npm install --save-dev vitest @vitest/coverage-v8` |
+| Installed `@playwright/test` | ✅ | E2E runner (was missing from devDeps) |
+| `vitest.config.ts` | ✅ | Node env, `@` alias, covers `lib/recovery` + `app/api/recovery` |
+| `playwright.config.ts` | ✅ | Chromium + Pixel-5 mobile; `webServer` reuses a running `npm start`; CI-aware retries |
+| Unit: `lib/recovery/code.ts` | ✅ | 11 tests — generateCode length/charset/ambiguity/uniqueness, formatGrouped, normalize |
+| Unit: `app/api/recovery/create/route.ts` | ✅ | 7 tests — 401 no-user, 500 missing-env, 500 upgrade-fail, 500 db-fail, 200 success, upsert payload |
+| Unit: `app/api/recovery/status/route.ts` | ✅ | 4 tests — no session, row found, no row, exception swallowed |
+| Unit: `app/api/recovery/redeem/route.ts` | ✅ | 11 tests — rate-limit, rate-limit DB error, no code, bad JSON, wrong code, success, sign-in fail, attempt logging ×2, normalize before compare |
+| E2E: `e2e/helpers/mock-api.ts` | ✅ | `page.route()` helpers for all recovery endpoints + Supabase pain_entries |
+| E2E: `e2e/anonymous-track.spec.ts` | ✅ | 5 specs — no redirect, gear icon visible, pain selector, navigation, no leaking app links |
+| E2E: `e2e/backup-flow.spec.ts` | ✅ | 6 specs — status display, drawer opens, code displayed, copy button, nudge banner presence |
+| E2E: `e2e/restore-flow.spec.ts` | ✅ | 7 specs — reachability, empty submit, wrong code error, rate-limit message, success redirect, back nav, aria-label |
+| Added `test`, `test:watch`, `test:coverage` scripts | ✅ | `npm test` runs all 33 unit tests |
+
+### New files
+- `vitest.config.ts`
+- `playwright.config.ts`
+- `__tests__/unit/recovery-code.test.ts`
+- `__tests__/unit/api/recovery-create.test.ts`
+- `__tests__/unit/api/recovery-status.test.ts`
+- `__tests__/unit/api/recovery-redeem.test.ts`
+- `e2e/helpers/mock-api.ts`
+- `e2e/anonymous-track.spec.ts`
+- `e2e/backup-flow.spec.ts`
+- `e2e/restore-flow.spec.ts`
+
+### Running the tests
+
+**Unit tests** (no external deps needed):
+```bash
+npm test                  # single run — 33 tests
+npm run test:watch        # watch mode
+npm run test:coverage     # with V8 coverage report
+```
+
+**E2E tests** (requires a running app + Supabase):
+```bash
+# 1. Apply migration:  supabase db push
+# 2. Enable anonymous sign-ins in Supabase dashboard
+# 3. npm run build && npm start
+# 4. NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... npx playwright test
+```
+E2E specs auto-skip with `test.skip` when `NEXT_PUBLIC_SUPABASE_URL` is not set.
+
+### Acceptance
+- `npm test` → 33/33 passing ✅
+- `npm run build` still passes ✅
+- All E2E specs annotated to skip gracefully without live Supabase ✅
+
+---
+
 ## Upcoming phases
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 5 | Automated tests (E2E + unit) | Not started |
 | 6 | Production rollout | Not started |
