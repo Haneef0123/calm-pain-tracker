@@ -135,9 +135,24 @@ export async function updateSession(request: NextRequest) {
 
     const { isValid } = getSessionFromCookies(request);
 
+    // Login-free routes: bootstrap an anonymous session instead of redirecting to sign-in.
+    const isTrackRoute =
+        request.nextUrl.pathname.startsWith('/track') ||
+        request.nextUrl.pathname.startsWith('/api/recovery');
+
+    if (isTrackRoute) {
+        if (!isValid) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                await supabase.auth.signInAnonymously();
+            }
+        }
+        return supabaseResponse;
+    }
+
     if (!isValid) {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (!session && !isAuthRoute) {
             const url = request.nextUrl.clone();
             url.pathname = '/sign-in';
