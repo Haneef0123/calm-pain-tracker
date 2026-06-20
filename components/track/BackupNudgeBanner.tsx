@@ -23,7 +23,7 @@ export function BackupNudgeBanner({ onSave, onDismiss }: BackupNudgeBannerProps)
       </Button>
       <button
         onClick={onDismiss}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-amber-700 hover:bg-amber-100"
+        className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full text-amber-700 hover:bg-amber-100"
         aria-label="Dismiss"
       >
         <X className="h-3.5 w-3.5" />

@@ -37,18 +37,23 @@ export function RecoveryCodeCard({ code }: RecoveryCodeCardProps) {
         {code}
       </p>
       <div className="mt-5 flex gap-3">
-        <Button
-          variant="outline"
-          onClick={handleCopy}
-          className="h-[44px] flex-1 rounded-full border-[#dde2dd] text-[13.5px]"
-          aria-live="polite"
-        >
-          {copied ? (
-            <><Check className="mr-2 h-4 w-4 text-[#008858]" />Copied</>
-          ) : (
-            <><Copy className="mr-2 h-4 w-4" />Copy</>
-          )}
-        </Button>
+        <div className="flex flex-1 flex-col">
+          <Button
+            variant="outline"
+            onClick={handleCopy}
+            className="h-[44px] w-full rounded-full border-[#dde2dd] text-[13.5px]"
+          >
+            {copied ? (
+              <><Check className="mr-2 h-4 w-4 text-[#008858]" />Copied</>
+            ) : (
+              <><Copy className="mr-2 h-4 w-4" />Copy</>
+            )}
+          </Button>
+          {/* Live region outside the button so screen readers announce the change */}
+          <span aria-live="polite" aria-atomic="true" className="sr-only">
+            {copied ? 'Copied to clipboard' : ''}
+          </span>
+        </div>
         <Button
           variant="outline"
           onClick={handleDownload}

@@ -17,7 +17,7 @@ export function TrackHeader({ today }: TrackHeaderProps) {
       </div>
       <Link
         href="/track/settings"
-        className="mt-1 flex h-9 w-9 items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
+        className="mt-1 flex h-[44px] w-[44px] items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
         aria-label="Settings"
       >
         <Settings className="h-5 w-5" />

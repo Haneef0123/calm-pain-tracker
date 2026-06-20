@@ -163,10 +163,38 @@
 
 ---
 
+---
+
+## Phase 4 — Hardening, edge cases & polish ✅ Done
+
+**Branch:** `claude/login-free-phase-doc-pu0t2s`  
+**Date:** 2026-06-20
+
+### What was done
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Fix `aria-live` on Copy button | ✅ | Moved to a sibling visually-hidden `<span aria-live="polite">` outside the button — `aria-live` on interactive elements is unreliable across screen readers |
+| Touch targets — icon buttons | ✅ | All icon-only buttons (back arrows, settings gear, nudge dismiss) raised from 36px / 28px → 44px |
+| History loading skeleton | ✅ | `isLoaded` from `usePainEntries` gates the skeleton (3 pulsing bars) vs empty state vs list — prevents flash of empty-state during fetch |
+| Restore input accessibility | ✅ | Added `aria-label`, `aria-invalid`, `aria-describedby` → error paragraph (id=`restore-error`); added `focus-visible:ring` for keyboard users |
+| Edge cases — double-submit | ✅ | Already covered: restore button disabled during verifying; backup Generate button disabled during loading |
+| Edge cases — code regeneration | ✅ | Already covered: `upsert` in create route replaces both the Supabase password and `code_hash`, invalidating the old code immediately |
+| Edge cases — switch orphaning | ✅ | Already covered by `SwitchAccountDialog` (Phase 3) |
+
+### Modified files
+- `components/track/RecoveryCodeCard.tsx` — fix `aria-live` region placement
+- `components/track/BackupNudgeBanner.tsx` — dismiss button 28px → 44px
+- `components/track/TrackHeader.tsx` — settings gear link 36px → 44px
+- `app/track/settings/page.tsx` — back button 36px → 44px
+- `app/track/history/page.tsx` — back button 36px → 44px; add loading skeleton
+- `app/track/restore/page.tsx` — back button 36px → 44px; input aria attributes + focus ring
+
+---
+
 ## Upcoming phases
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 4 | Hardening, edge cases, a11y, polish | Not started |
 | 5 | Automated tests (E2E + unit) | Not started |
 | 6 | Production rollout | Not started |

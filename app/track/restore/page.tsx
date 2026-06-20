@@ -82,7 +82,7 @@ export default function TrackRestorePage() {
         <header className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
+            className="flex h-[44px] w-[44px] items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
             aria-label="Back"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -95,6 +95,14 @@ export default function TrackRestorePage() {
 
           <input
             type="text"
+            id="recovery-code-input"
+            aria-label="Recovery code"
+            aria-invalid={formState === 'invalid'}
+            aria-describedby={
+              formState !== 'idle' && formState !== 'verifying'
+                ? 'restore-error'
+                : undefined
+            }
             value={code}
             onChange={(e) => {
               setCode(e.target.value);
@@ -105,21 +113,21 @@ export default function TrackRestorePage() {
             autoCorrect="off"
             spellCheck={false}
             disabled={formState === 'verifying'}
-            className="w-full rounded-[14px] border border-black/10 bg-white px-4 py-3 font-mono text-[16px] tracking-[0.15em] text-[#1c211d] placeholder:tracking-normal placeholder:text-[#c0c4c1] focus:border-[#1c211d] focus:outline-none disabled:opacity-50"
+            className="w-full rounded-[14px] border border-black/10 bg-white px-4 py-3 font-mono text-[16px] tracking-[0.15em] text-[#1c211d] placeholder:tracking-normal placeholder:text-[#c0c4c1] focus:border-[#1c211d] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1c211d] focus-visible:ring-offset-1 disabled:opacity-50"
           />
 
           {formState === 'invalid' && (
-            <p role="alert" className="text-[13px] text-[#d53627]">
+            <p id="restore-error" role="alert" className="text-[13px] text-[#d53627]">
               That code didn&apos;t match. Check the characters and try again.
             </p>
           )}
           {formState === 'rate-limited' && (
-            <p role="alert" className="text-[13px] text-[#d53627]">
+            <p id="restore-error" role="alert" className="text-[13px] text-[#d53627]">
               Too many attempts. Please try again in ~{retryMinutes} minutes.
             </p>
           )}
           {formState === 'network-error' && (
-            <p role="alert" className="text-[13px] text-[#d53627]">
+            <p id="restore-error" role="alert" className="text-[13px] text-[#d53627]">
               Couldn&apos;t reach the server. Check your connection.
             </p>
           )}

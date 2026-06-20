@@ -10,7 +10,7 @@ import { usePainEntries } from '@/hooks/use-pain-entries';
 
 export default function TrackHistoryPage() {
   const router = useRouter();
-  const { entries, deleteEntry } = usePainEntries();
+  const { entries, deleteEntry, isLoaded } = usePainEntries();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
@@ -19,20 +19,26 @@ export default function TrackHistoryPage() {
         <header className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
+            className="flex h-[44px] w-[44px] items-center justify-center rounded-full text-[#919191] hover:bg-[#eef1ee] hover:text-[#1c211d]"
             aria-label="Back"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
             <h1 className="page-title">Past days</h1>
-            {entries.length > 0 && (
+            {isLoaded && entries.length > 0 && (
               <p className="page-subtitle">{entries.length} entries</p>
             )}
           </div>
         </header>
 
-        {entries.length === 0 ? (
+        {!isLoaded ? (
+          <div className="flex flex-col gap-[10px]" aria-label="Loading entries" aria-busy="true">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-[62px] animate-pulse rounded-[18px] bg-[#f0f2f0]" />
+            ))}
+          </div>
+        ) : entries.length === 0 ? (
           <div className="space-y-4 py-16 text-center">
             <p className="text-[15px] font-medium text-[#1c211d]">No entries yet.</p>
             <Link
