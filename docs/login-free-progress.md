@@ -254,8 +254,34 @@ E2E specs auto-skip with `test.skip` when `NEXT_PUBLIC_SUPABASE_URL` is not set.
 
 ---
 
-## Upcoming phases
+---
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 6 | Production rollout | Not started |
+## Phase 6 — Production rollout ✅ Done
+
+**Branch:** `claude/login-free-plan-phases-po85ze`  
+**Date:** 2026-06-20
+
+### What was done
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Entry point on sign-in page | ✅ | "Try without signing in →" link → `/track` below the Google button |
+| `docs/production-rollout.md` | ✅ | Step-by-step ops checklist: migration, Supabase config, Vercel env vars, smoke tests, monitoring, rollback |
+| README updated | ✅ | Features section, updated scripts table (npm), env vars table, login-free section, link to rollout doc |
+
+### New / modified files
+- **Modified:** `app/sign-in/page.tsx` — added "Try without signing in →" entry point
+- **New:** `docs/production-rollout.md` — production go-live checklist
+- **Modified:** `README.md` — full update with login-free docs
+
+### Ops steps (manual — outside this codebase)
+1. `supabase db push` against the production project
+2. Enable Anonymous sign-ins in Supabase dashboard → Authentication → Providers
+3. Add `RECOVERY_SYNTHETIC_EMAIL_DOMAIN` to Vercel environment variables
+4. Redeploy on Vercel
+5. Run smoke tests per `docs/production-rollout.md`
+
+### Acceptance
+- Sign-in page shows "Try without signing in →" link ✅
+- `docs/production-rollout.md` covers all go-live steps ✅
+- `npm run build` passes ✅
