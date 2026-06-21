@@ -62,6 +62,18 @@ export default function SignInPage() {
                 <p className="text-xs text-muted-foreground">
                     Your data is stored securely in the cloud
                 </p>
+
+                <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-2">
+                        No account? No problem.
+                    </p>
+                    <a
+                        href="/track"
+                        className="text-sm text-primary underline-offset-4 hover:underline"
+                    >
+                        Try without signing in →
+                    </a>
+                </div>
             </div>
         </div>
     );

@@ -63,6 +63,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS pain_entries_set_updated_at ON public.pain_entries;
 CREATE TRIGGER pain_entries_set_updated_at
   BEFORE UPDATE ON public.pain_entries
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -73,19 +74,23 @@ CREATE TRIGGER pain_entries_set_updated_at
 
 ALTER TABLE public.pain_entries ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own pain entries" ON public.pain_entries;
 CREATE POLICY "Users can view their own pain entries"
   ON public.pain_entries FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own pain entries" ON public.pain_entries;
 CREATE POLICY "Users can insert their own pain entries"
   ON public.pain_entries FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own pain entries" ON public.pain_entries;
 CREATE POLICY "Users can update their own pain entries"
   ON public.pain_entries FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own pain entries" ON public.pain_entries;
 CREATE POLICY "Users can delete their own pain entries"
   ON public.pain_entries FOR DELETE
   USING (auth.uid() = user_id);
