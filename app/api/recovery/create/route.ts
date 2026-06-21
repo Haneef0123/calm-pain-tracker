@@ -21,7 +21,13 @@ export async function POST() {
   const codeHash = await bcrypt.hash(code, 10);
   const syntheticEmail = `${user.id}@${domain}`;
 
-  const adminClient = createAdminClient();
+  let adminClient: ReturnType<typeof createAdminClient>;
+  try {
+    adminClient = createAdminClient();
+  } catch (e) {
+    console.error('Failed to create admin client:', e);
+    return Response.json({ error: 'Server misconfigured (admin)' }, { status: 500 });
+  }
 
   // Upgrade anonymous account to permanent by setting synthetic email + code as password.
   // email_confirm: true skips the confirmation email entirely.
@@ -33,7 +39,10 @@ export async function POST() {
 
   if (updateError) {
     console.error('Failed to upgrade user:', updateError);
-    return Response.json({ error: 'Failed to create recovery code' }, { status: 500 });
+    return Response.json(
+      { error: 'Failed to create recovery code', detail: updateError.message },
+      { status: 500 }
+    );
   }
 
   // Upsert so regenerating replaces the previous code immediately
@@ -46,7 +55,10 @@ export async function POST() {
 
   if (dbError) {
     console.error('Failed to store code hash:', dbError);
-    return Response.json({ error: 'Failed to store recovery code' }, { status: 500 });
+    return Response.json(
+      { error: 'Failed to store recovery code', detail: dbError.message },
+      { status: 500 }
+    );
   }
 
   return Response.json({ code: formatGrouped(code) });
