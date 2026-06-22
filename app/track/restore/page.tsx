@@ -11,6 +11,7 @@ import { BackupDrawer } from '@/components/track/BackupDrawer';
 import { usePainEntries } from '@/hooks/use-pain-entries';
 import { useBackupStatus } from '@/hooks/use-backup-status';
 import { toast } from '@/hooks/use-toast';
+import { applyCodeInput, RECOVERY_CODE_LENGTH } from '@/lib/recovery/code';
 
 type FormState = 'idle' | 'verifying' | 'invalid' | 'rate-limited' | 'network-error';
 
@@ -66,7 +67,7 @@ export default function TrackRestorePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || formState === 'verifying') return;
+    if (code.length < RECOVERY_CODE_LENGTH || formState === 'verifying') return;
 
     if (unsavedCount > 0) {
       setSwitchDialogOpen(true);
@@ -105,13 +106,14 @@ export default function TrackRestorePage() {
             }
             value={code}
             onChange={(e) => {
-              setCode(e.target.value);
+              setCode(applyCodeInput(e.target.value, code));
               if (formState !== 'idle') setFormState('idle');
             }}
             placeholder="XXXX-XXXX-XXXX"
             autoCapitalize="characters"
             autoCorrect="off"
             spellCheck={false}
+            inputMode="text"
             disabled={formState === 'verifying'}
             className="w-full rounded-[14px] border border-black/10 bg-white px-4 py-3 font-mono text-[16px] tracking-[0.15em] text-[#1c211d] placeholder:tracking-normal placeholder:text-[#c0c4c1] focus:border-[#1c211d] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1c211d] focus-visible:ring-offset-1 disabled:opacity-50"
           />
@@ -134,7 +136,7 @@ export default function TrackRestorePage() {
 
           <Button
             type="submit"
-            disabled={!code.trim() || formState === 'verifying'}
+            disabled={code.length < RECOVERY_CODE_LENGTH || formState === 'verifying'}
             className="h-[52px] w-full rounded-full bg-[#181b19] text-[14px] font-semibold text-white hover:bg-[#2c302d] disabled:opacity-50"
           >
             {formState === 'verifying' ? (
