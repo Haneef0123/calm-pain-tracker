@@ -36,7 +36,21 @@ export async function POST() {
     return Response.json({ error: 'Failed to create recovery code' }, { status: 500 });
   }
 
-  // Upsert so regenerating replaces the previous code immediately
+  // updateUserById changes the underlying auth credentials, so the browser's
+  // anonymous session cookie is no longer valid. Re-sign in immediately with
+  // the new synthetic credentials so the current device keeps a fresh session.
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: syntheticEmail,
+    password: code,
+  });
+
+  if (signInError) {
+    console.error('Failed to refresh session after recovery upgrade:', signInError);
+    return Response.json({ error: 'Failed to refresh session' }, { status: 500 });
+  }
+
+  // Upsert after the session refresh so a cookie-sync failure never leaves
+  // the current device signed out after writing a successful recovery row.
   const { error: dbError } = await adminClient
     .from('recovery_codes')
     .upsert(

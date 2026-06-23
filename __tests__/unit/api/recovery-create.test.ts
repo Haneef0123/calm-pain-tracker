@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.hoisted() runs before vi.mock() hoisting, so the refs are available inside factories
-const { mockGetUser, mockUpdateUserById, mockUpsert, mockFrom } = vi.hoisted(() => ({
+const { mockGetUser, mockUpdateUserById, mockSignInWithPassword, mockUpsert, mockFrom } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockUpdateUserById: vi.fn(),
+  mockSignInWithPassword: vi.fn(),
   mockUpsert: vi.fn(),
   mockFrom: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
-    auth: { getUser: mockGetUser },
+    auth: { getUser: mockGetUser, signInWithPassword: mockSignInWithPassword },
   }),
 }));
 
@@ -40,6 +41,7 @@ describe('POST /api/recovery/create', () => {
     process.env.RECOVERY_SYNTHETIC_EMAIL_DOMAIN = 'anon.test.com';
 
     mockUpdateUserById.mockResolvedValue({ error: null });
+    mockSignInWithPassword.mockResolvedValue({ error: null });
     mockUpsert.mockResolvedValue({ error: null });
     mockFrom.mockReturnValue({ upsert: mockUpsert });
   });
@@ -88,6 +90,16 @@ describe('POST /api/recovery/create', () => {
     expect(await res.json()).toMatchObject({ error: 'Failed to store recovery code' });
   });
 
+  it('returns 500 when refreshing the session after upgrade fails', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'uid-1' } }, error: null });
+    mockSignInWithPassword.mockResolvedValue({ error: new Error('sign in failed') });
+
+    const res = await POST();
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: 'Failed to refresh session' });
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
   it('returns the formatted code on success', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'uid-1' } }, error: null });
 
@@ -109,5 +121,16 @@ describe('POST /api/recovery/create', () => {
       }),
       { onConflict: 'user_id' }
     );
+  });
+
+  it('refreshes the current device session using the new synthetic credentials', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'uid-42' } }, error: null });
+
+    await POST();
+
+    expect(mockSignInWithPassword).toHaveBeenCalledWith({
+      email: 'uid-42@anon.test.com',
+      password: 'ABCDEFGHJKMN',
+    });
   });
 });
